@@ -322,3 +322,21 @@ class DesignStateError(FusionMCPError):
         message = f"Design state error: {issue}"
         context = ErrorContext(additional_info=current_state)
         super().__init__(message, context=context, **kwargs)
+
+
+class ValidationError(FusionMCPError):
+    """Raised when validation or measurement operations fail."""
+
+    error_type = "ValidationError"
+    default_suggestion = "Check that all entities exist and support the requested validation operation."
+
+    def __init__(
+        self,
+        operation: str,
+        reason: str,
+        affected_entities: Optional[List[str]] = None,
+        **kwargs,
+    ):
+        message = f"Validation error during {operation}: {reason}"
+        context = ErrorContext(affected_entities=affected_entities)
+        super().__init__(message, context=context, **kwargs)

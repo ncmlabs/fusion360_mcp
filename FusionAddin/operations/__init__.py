@@ -32,6 +32,13 @@ from .modification_ops import (
     delete_feature,
     edit_sketch,
 )
+from .validation_ops import (
+    measure_distance,
+    measure_angle,
+    check_interference,
+    get_body_properties,
+    get_sketch_status,
+)
 
 __all__ = [
     # Body operations
@@ -57,4 +64,10 @@ __all__ = [
     "delete_body",
     "delete_feature",
     "edit_sketch",
+    # Validation operations
+    "measure_distance",
+    "measure_angle",
+    "check_interference",
+    "get_body_properties",
+    "get_sketch_status",
 ]

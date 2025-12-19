@@ -5,7 +5,12 @@ from mcp.server.fastmcp import FastMCP
 
 from .config import get_config
 from .logging import setup_logging, get_logger
-from .tools import register_query_tools, register_creation_tools, register_modification_tools
+from .tools import (
+    register_query_tools,
+    register_creation_tools,
+    register_modification_tools,
+    register_validation_tools,
+)
 
 
 # Create FastMCP server instance
@@ -35,6 +40,13 @@ MODIFICATION WORKFLOW:
 4. Update design parameters with update_parameter() for dynamic changes
 5. Delete bodies with delete_body() or features with delete_feature()
 6. Edit sketch curves with edit_sketch() to modify geometry
+
+VALIDATION WORKFLOW:
+1. Use measure_distance() to verify spacing between entities (accurate to 0.001mm)
+2. Use measure_angle() to check angles between faces or edges
+3. Use check_interference() to detect collisions between bodies
+4. Use get_body_properties() for volume, area, center of mass, and dimensions
+5. Use get_sketch_status() to check if a sketch is fully constrained
 
 IMPORTANT:
 - All dimensions are in millimeters (mm)
@@ -92,6 +104,9 @@ def main() -> None:
 
     register_modification_tools(mcp)
     logger.info("Modification tools registered")
+
+    register_validation_tools(mcp)
+    logger.info("Validation tools registered")
 
     # Determine transport
     transport = args.transport or config.server_transport

@@ -68,6 +68,15 @@ from handlers.modification_handlers import (
     handle_edit_sketch,
 )
 
+# Import validation handlers
+from handlers.validation_handlers import (
+    handle_measure_distance,
+    handle_measure_angle,
+    handle_check_interference,
+    handle_get_body_properties,
+    handle_get_sketch_status,
+)
+
 
 # Global state
 _app: Optional[Any] = None
@@ -113,6 +122,7 @@ def run(context: Dict[str, Any]) -> None:
         _register_query_routes()
         _register_creation_routes()
         _register_modification_routes()
+        _register_validation_routes()
 
         # Start HTTP server
         config = ServerConfig(host=HTTP_HOST, port=HTTP_PORT)
@@ -211,6 +221,13 @@ def _register_task_handlers() -> None:
     _event_manager.register_task_handler("delete_feature", handle_delete_feature)
     _event_manager.register_task_handler("edit_sketch", handle_edit_sketch)
 
+    # Phase 4: Validation handlers
+    _event_manager.register_task_handler("measure_distance", handle_measure_distance)
+    _event_manager.register_task_handler("measure_angle", handle_measure_angle)
+    _event_manager.register_task_handler("check_interference", handle_check_interference)
+    _event_manager.register_task_handler("get_body_properties", handle_get_body_properties)
+    _event_manager.register_task_handler("get_sketch_status", handle_get_sketch_status)
+
 
 def _register_query_routes() -> None:
     """Register HTTP routes for query endpoints."""
@@ -266,6 +283,20 @@ def _register_modification_routes() -> None:
 
     # Phase 3: Sketch edit routes
     FusionHTTPHandler.register_route("POST", "/modify/sketch", "edit_sketch")
+
+
+def _register_validation_routes() -> None:
+    """Register HTTP routes for validation endpoints."""
+    # Phase 4: Measurement routes
+    FusionHTTPHandler.register_route("POST", "/validate/measure_distance", "measure_distance")
+    FusionHTTPHandler.register_route("POST", "/validate/measure_angle", "measure_angle")
+
+    # Phase 4: Interference detection routes
+    FusionHTTPHandler.register_route("POST", "/validate/check_interference", "check_interference")
+
+    # Phase 4: Property and status routes
+    FusionHTTPHandler.register_route("POST", "/validate/body_properties", "get_body_properties")
+    FusionHTTPHandler.register_route("POST", "/validate/sketch_status", "get_sketch_status")
 
 
 def _show_message(message: str) -> None:

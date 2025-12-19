@@ -917,3 +917,98 @@ class FusionClient:
             "curve_id": curve_id,
             "properties": properties,
         })
+
+    # --- Validation Methods ---
+
+    async def measure_distance(
+        self,
+        entity1_id: str,
+        entity2_id: str,
+    ) -> Dict[str, Any]:
+        """Measure minimum distance between two entities.
+
+        Supports body-to-body, face-to-face, edge-to-edge, and other
+        entity combinations.
+
+        Args:
+            entity1_id: ID of the first entity
+            entity2_id: ID of the second entity
+
+        Returns:
+            Dict with distance (mm), point1, point2 (closest points)
+        """
+        return await self._request("POST", "/validate/measure_distance", {
+            "entity1_id": entity1_id,
+            "entity2_id": entity2_id,
+        })
+
+    async def measure_angle(
+        self,
+        entity1_id: str,
+        entity2_id: str,
+    ) -> Dict[str, Any]:
+        """Measure angle between two planar faces or linear edges.
+
+        Args:
+            entity1_id: ID of the first entity (face or edge)
+            entity2_id: ID of the second entity (face or edge)
+
+        Returns:
+            Dict with angle in degrees (0-180)
+        """
+        return await self._request("POST", "/validate/measure_angle", {
+            "entity1_id": entity1_id,
+            "entity2_id": entity2_id,
+        })
+
+    async def check_interference(
+        self,
+        body_ids: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Check for interference (collisions) between bodies.
+
+        Args:
+            body_ids: Optional list of body IDs to check.
+                     If None, checks all bodies.
+
+        Returns:
+            Dict with has_interference, interferences list, bodies_checked
+        """
+        data = {}
+        if body_ids is not None:
+            data["body_ids"] = body_ids
+        return await self._request("POST", "/validate/check_interference", data)
+
+    async def get_body_properties(
+        self,
+        body_id: str,
+    ) -> Dict[str, Any]:
+        """Get detailed physical properties of a body.
+
+        Args:
+            body_id: ID of the body to analyze
+
+        Returns:
+            Dict with volume, area, center_of_mass, bounding_box,
+            dimensions, topology counts
+        """
+        return await self._request("POST", "/validate/body_properties", {
+            "body_id": body_id,
+        })
+
+    async def get_sketch_status(
+        self,
+        sketch_id: str,
+    ) -> Dict[str, Any]:
+        """Get the constraint status of a sketch.
+
+        Args:
+            sketch_id: ID of the sketch to analyze
+
+        Returns:
+            Dict with is_fully_constrained, under_constrained_count,
+            profiles_count, curves_count, constraints_count, etc.
+        """
+        return await self._request("POST", "/validate/sketch_status", {
+            "sketch_id": sketch_id,
+        })
