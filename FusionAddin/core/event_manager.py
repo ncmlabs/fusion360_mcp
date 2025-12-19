@@ -69,7 +69,7 @@ class EventManager:
             self._custom_event = self.app.registerCustomEvent(self._event_name)
 
             # Create and register event handler
-            self._event_handler = TaskEventHandler(self)
+            self._event_handler = _create_task_event_handler(self)
             self._custom_event.add(self._event_handler)
             self._handlers.append(self._event_handler)
 
@@ -131,82 +131,84 @@ class EventManager:
             pass
 
 
-class TaskEventHandler:
-    """Handles custom events for task processing.
+def _create_task_event_handler(manager: "EventManager") -> Any:
+    """Create a TaskEventHandler that inherits from adsk.core.CustomEventHandler.
 
-    This is a wrapper that implements the CustomEventHandler interface.
-    In actual use with Fusion 360, this should inherit from
-    adsk.core.CustomEventHandler.
+    This function dynamically creates the handler class to properly inherit
+    from the Fusion 360 API base class.
+
+    Args:
+        manager: The EventManager instance
+
+    Returns:
+        A TaskEventHandler instance
     """
+    import adsk.core
+    from .task_queue import get_task_queue, set_task_result
 
-    def __init__(self, manager: EventManager):
-        self.manager = manager
-        # Import here to avoid circular imports
-        from .task_queue import get_task_queue, set_task_result
+    class TaskEventHandler(adsk.core.CustomEventHandler):
+        """Handles custom events for task processing."""
 
-        self._get_queue = get_task_queue
-        self._set_result = set_task_result
+        def __init__(self):
+            super().__init__()
+            self.manager = manager
+            self._get_queue = get_task_queue
+            self._set_result = set_task_result
 
-    def notify(self, args: Any) -> None:
-        """Called when custom event fires - process pending tasks.
+        def notify(self, args: adsk.core.CustomEventArgs) -> None:
+            """Called when custom event fires - process pending tasks."""
+            try:
+                import queue as queue_module
+                task_queue = self._get_queue()
 
-        Args:
-            args: CustomEventArgs from Fusion 360
-        """
-        try:
-            import queue as queue_module
-            task_queue = self._get_queue()
+                # Process all pending tasks
+                while not task_queue.empty():
+                    try:
+                        task = task_queue.get_nowait()
+                        self._process_task(task)
+                    except queue_module.Empty:
+                        break
+                    except Exception as e:
+                        # Log but continue processing
+                        pass
 
-            # Process all pending tasks
-            while not task_queue.empty():
+            except Exception as e:
                 try:
-                    task = task_queue.get_nowait()
-                    self._process_task(task)
-                except queue_module.Empty:
-                    break
-                except Exception as e:
-                    # Log but continue processing
+                    if self.manager.ui:
+                        import traceback
+                        self.manager.ui.messageBox(
+                            f"Task processing error: {traceback.format_exc()}"
+                        )
+                except:
                     pass
 
-        except Exception as e:
+        def _process_task(self, task: Any) -> None:
+            """Process a single task."""
             try:
-                if self.manager.ui:
-                    import traceback
-                    self.manager.ui.messageBox(
-                        f"Task processing error: {traceback.format_exc()}"
+                handler = self.manager.get_handler(task.name)
+
+                if handler is None:
+                    self._set_result(
+                        task.id,
+                        success=False,
+                        error=f"Unknown task: {task.name}",
+                        error_type="UNKNOWN_TASK"
                     )
-            except:
-                pass
+                    return
 
-    def _process_task(self, task: Any) -> None:
-        """Process a single task.
+                # Execute the handler
+                result = handler(task.args)
+                self._set_result(task.id, success=True, result=result)
 
-        Args:
-            task: Task object from the queue
-        """
-        try:
-            handler = self.manager.get_handler(task.name)
-
-            if handler is None:
+            except Exception as e:
                 self._set_result(
                     task.id,
                     success=False,
-                    error=f"Unknown task: {task.name}",
-                    error_type="UNKNOWN_TASK"
+                    error=str(e),
+                    error_type=type(e).__name__
                 )
-                return
 
-            # Execute the handler
-            result = handler(task.args)
-            self._set_result(task.id, success=True, result=result)
-
-        except Exception as e:
-            self._set_result(
-                task.id,
-                success=False,
-                error=str(e),
-                error_type=type(e).__name__
-            )
+    return TaskEventHandler()
 
 
 class PollingThread(threading.Thread):

@@ -5,11 +5,6 @@ and have full access to the Fusion 360 API.
 """
 
 from typing import Dict, Any, Optional, List
-import sys
-import os
-
-# Add parent directory to path for imports when running in Fusion
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Fusion 360 API imports
 try:
@@ -19,13 +14,11 @@ try:
 except ImportError:
     FUSION_AVAILABLE = False
 
+# Local imports (path set up by FusionMCP.py)
 from core.entity_registry import get_registry, reset_registry
 from serializers.body_serializer import BodySerializer
 from serializers.sketch_serializer import SketchSerializer
 from serializers.feature_serializer import FeatureSerializer
-
-# Import shared exceptions
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from shared.exceptions import (
     DesignStateError,
     EntityNotFoundError,
