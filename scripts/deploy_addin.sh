@@ -69,6 +69,10 @@ cp "$SOURCE_DIR/handlers/"*.py "$TARGET_DIR/handlers/"
 mkdir -p "$TARGET_DIR/serializers"
 cp "$SOURCE_DIR/serializers/"*.py "$TARGET_DIR/serializers/"
 
+# Copy operations module (Phase 2)
+mkdir -p "$TARGET_DIR/operations"
+cp "$SOURCE_DIR/operations/"*.py "$TARGET_DIR/operations/"
+
 # Copy shared module (needed for exceptions)
 mkdir -p "$TARGET_DIR/shared"
 cp "$PROJECT_ROOT/shared/"*.py "$TARGET_DIR/shared/"
