@@ -906,6 +906,8 @@ def handle_add_constraint_coincident(args: Dict[str, Any]) -> Dict[str, Any]:
             - sketch_id: ID of the sketch (required)
             - entity1_id: ID of the first entity (required)
             - entity2_id: ID of the second entity (required)
+            - point1: For curves, which point: "start" or "end" (default "end")
+            - point2: For curves, which point: "start" or "end" (default "start")
 
     Returns:
         Dict with constraint information and sketch status
@@ -921,6 +923,8 @@ def handle_add_constraint_coincident(args: Dict[str, Any]) -> Dict[str, Any]:
         sketch_id=args["sketch_id"],
         entity1_id=args["entity1_id"],
         entity2_id=args["entity2_id"],
+        point1=args.get("point1", "end"),
+        point2=args.get("point2", "start"),
     )
 
 

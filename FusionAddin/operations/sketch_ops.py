@@ -2122,6 +2122,8 @@ def add_constraint_coincident(
     sketch_id: str,
     entity1_id: str,
     entity2_id: str,
+    point1: str = "end",
+    point2: str = "start",
 ) -> Dict[str, Any]:
     """Add a coincident constraint between two entities.
 
@@ -2131,6 +2133,8 @@ def add_constraint_coincident(
         sketch_id: ID of the sketch
         entity1_id: ID of the first entity (point or curve)
         entity2_id: ID of the second entity (point or curve)
+        point1: For curves, which point to use: "start" or "end" (default "end")
+        point2: For curves, which point to use: "start" or "end" (default "start")
 
     Returns:
         Dict with constraint information and sketch status
@@ -2145,6 +2149,28 @@ def add_constraint_coincident(
     try:
         entity1 = _get_sketch_entity(sketch, entity1_id, registry)
         entity2 = _get_sketch_entity(sketch, entity2_id, registry)
+
+        # Extract points from curves if needed
+        # For lines, use startSketchPoint or endSketchPoint
+        if hasattr(entity1, 'startSketchPoint') and hasattr(entity1, 'endSketchPoint'):
+            # It's a line, get the specified endpoint
+            if point1 == "start":
+                entity1 = entity1.startSketchPoint
+            else:
+                entity1 = entity1.endSketchPoint
+
+        if hasattr(entity2, 'startSketchPoint') and hasattr(entity2, 'endSketchPoint'):
+            # It's a line, get the specified endpoint
+            if point2 == "start":
+                entity2 = entity2.startSketchPoint
+            else:
+                entity2 = entity2.endSketchPoint
+
+        # For circles/arcs, use centerSketchPoint
+        if hasattr(entity1, 'centerSketchPoint') and not hasattr(entity1, 'startSketchPoint'):
+            entity1 = entity1.centerSketchPoint
+        if hasattr(entity2, 'centerSketchPoint') and not hasattr(entity2, 'startSketchPoint'):
+            entity2 = entity2.centerSketchPoint
 
         # Add coincident constraint
         constraints = sketch.geometricConstraints
@@ -2490,55 +2516,23 @@ def add_constraint_fix(
 ) -> Dict[str, Any]:
     """Fix a point or curve in place.
 
-    Fixes the entity so it cannot move during constraint solving.
+    NOTE: The Fix/Unfix constraint is not available via the Fusion 360 API.
+    This function is provided for API completeness but will raise an error.
+    Use dimensions to lock geometry positions instead.
 
     Args:
         sketch_id: ID of the sketch
         entity_id: ID of the point or curve to fix
 
-    Returns:
-        Dict with constraint information and sketch status
-
     Raises:
-        EntityNotFoundError: If sketch or entity not found
-        FeatureError: If constraint creation fails
+        FeatureError: Always - Fix constraint not available via API
     """
-    registry = get_registry()
-    sketch = _get_sketch(sketch_id)
-
-    try:
-        entity = _get_sketch_entity(sketch, entity_id, registry)
-
-        # Add fix constraint
-        constraints = sketch.geometricConstraints
-        constraint = constraints.addFix(entity)
-
-        if not constraint:
-            raise FeatureError("fix_constraint", "Failed to create fix constraint")
-
-        # Get constraint index for ID
-        constraint_index = constraints.count - 1
-        constraint_id = f"{sketch_id}_constraint_{constraint_index}"
-
-        return {
-            "success": True,
-            "constraint": {
-                "id": constraint_id,
-                "type": "fix",
-                "entity_id": entity_id,
-            },
-            "sketch_id": sketch_id,
-            "sketch_status": _get_sketch_status(sketch),
-        }
-
-    except Exception as e:
-        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
-            raise
-        raise FeatureError(
-            "fix_constraint",
-            f"Failed to add fix constraint: {str(e)}",
-            fusion_error=str(e)
-        )
+    raise FeatureError(
+        "fix_constraint",
+        "Fix constraint is not available via the Fusion 360 API. "
+        "Use dimensions (distance from origin) to lock geometry positions instead.",
+        suggestion="Add distance dimensions from origin points to fix positions."
+    )
 
 
 def add_dimension(
