@@ -407,6 +407,347 @@ def register_creation_tools(mcp: FastMCP) -> None:
                 end_angle=end_angle,
             )
 
+    # --- Advanced Sketch Geometry Tools ---
+
+    @mcp.tool()
+    async def draw_polygon(
+        sketch_id: str,
+        radius: float,
+        sides: int,
+        center_x: float = 0.0,
+        center_y: float = 0.0,
+        rotation_angle: float = 0.0,
+    ) -> dict:
+        """Draw a regular polygon in a sketch.
+
+        Creates a regular polygon (triangle, square, pentagon, hexagon, etc.)
+        by calculating vertices on a circumscribed circle and connecting them.
+
+        **All dimensions in millimeters (mm), angles in degrees.**
+
+        Args:
+            sketch_id: ID of the sketch to draw in.
+            radius: Circumscribed circle radius in mm (distance from center to vertex).
+                   Must be positive.
+            sides: Number of sides (3-64). Examples: 3=triangle, 4=square,
+                  5=pentagon, 6=hexagon, 8=octagon.
+            center_x: Center X coordinate in mm. Default 0.
+            center_y: Center Y coordinate in mm. Default 0.
+            rotation_angle: Rotation angle in degrees. Default 0 (first vertex
+                           points in positive X direction).
+
+        Returns:
+            Dict containing:
+            - success: True if polygon was created
+            - curves: List of curve IDs for the polygon edges
+            - polygon: Polygon info with center, radius, sides, side_length,
+                      apothem, perimeter, area
+            - sketch_id: The sketch the polygon was added to
+            - profiles_count: Number of closed profiles in the sketch
+
+        Example:
+            # Draw a hexagon with 20mm radius
+            result = await draw_polygon(
+                sketch_id="Sketch1",
+                radius=20,
+                sides=6
+            )
+
+            # Draw a rotated octagon
+            result = await draw_polygon(
+                sketch_id="Sketch1",
+                center_x=50, center_y=50,
+                radius=15,
+                sides=8,
+                rotation_angle=22.5
+            )
+        """
+        logger.info(
+            "draw_polygon called",
+            sketch_id=sketch_id,
+            center_x=center_x,
+            center_y=center_y,
+            radius=radius,
+            sides=sides,
+            rotation_angle=rotation_angle,
+        )
+        async with FusionClient() as client:
+            return await client.draw_polygon(
+                sketch_id=sketch_id,
+                center_x=center_x,
+                center_y=center_y,
+                radius=radius,
+                sides=sides,
+                rotation_angle=rotation_angle,
+            )
+
+    @mcp.tool()
+    async def draw_ellipse(
+        sketch_id: str,
+        major_radius: float,
+        minor_radius: float,
+        center_x: float = 0.0,
+        center_y: float = 0.0,
+        rotation_angle: float = 0.0,
+    ) -> dict:
+        """Draw an ellipse in a sketch.
+
+        Creates an ellipse (oval) with specified major and minor radii.
+
+        **All dimensions in millimeters (mm), angles in degrees.**
+
+        Args:
+            sketch_id: ID of the sketch to draw in.
+            major_radius: Major axis radius in mm (longest radius). Must be positive.
+            minor_radius: Minor axis radius in mm (shortest radius). Must be positive
+                         and less than or equal to major_radius.
+            center_x: Center X coordinate in mm. Default 0.
+            center_y: Center Y coordinate in mm. Default 0.
+            rotation_angle: Rotation of major axis in degrees. Default 0
+                           (major axis along positive X).
+
+        Returns:
+            Dict containing:
+            - success: True if ellipse was created
+            - curve: Curve info with id, type, center, radii, perimeter, area
+            - sketch_id: The sketch the ellipse was added to
+            - profiles_count: Number of closed profiles in the sketch
+
+        Example:
+            # Draw an ellipse with 30mm x 20mm radii
+            result = await draw_ellipse(
+                sketch_id="Sketch1",
+                major_radius=30,
+                minor_radius=20
+            )
+
+            # Draw a 45-degree rotated ellipse
+            result = await draw_ellipse(
+                sketch_id="Sketch1",
+                center_x=50, center_y=0,
+                major_radius=25,
+                minor_radius=15,
+                rotation_angle=45
+            )
+        """
+        logger.info(
+            "draw_ellipse called",
+            sketch_id=sketch_id,
+            center_x=center_x,
+            center_y=center_y,
+            major_radius=major_radius,
+            minor_radius=minor_radius,
+            rotation_angle=rotation_angle,
+        )
+        async with FusionClient() as client:
+            return await client.draw_ellipse(
+                sketch_id=sketch_id,
+                center_x=center_x,
+                center_y=center_y,
+                major_radius=major_radius,
+                minor_radius=minor_radius,
+                rotation_angle=rotation_angle,
+            )
+
+    @mcp.tool()
+    async def draw_slot(
+        sketch_id: str,
+        length: float,
+        width: float,
+        center_x: float = 0.0,
+        center_y: float = 0.0,
+        slot_type: str = "overall",
+        rotation_angle: float = 0.0,
+    ) -> dict:
+        """Draw a slot shape (rounded rectangle/oblong) in a sketch.
+
+        Creates a slot by drawing two parallel lines connected by two
+        semicircular arcs. Commonly used for mounting holes and adjustable
+        fastener positions.
+
+        **All dimensions in millimeters (mm), angles in degrees.**
+
+        Args:
+            sketch_id: ID of the sketch to draw in.
+            length: Slot length in mm. Interpretation depends on slot_type.
+            width: Slot width in mm (diameter of the rounded ends). Must be positive.
+            center_x: Center X coordinate in mm. Default 0.
+            center_y: Center Y coordinate in mm. Default 0.
+            slot_type: How to interpret the length parameter:
+                      - "overall": length is total slot length (default)
+                      - "center_to_center": length is distance between arc centers
+            rotation_angle: Rotation angle in degrees. Default 0 (horizontal slot).
+
+        Returns:
+            Dict containing:
+            - success: True if slot was created
+            - curves: List of curve IDs (2 lines + 2 arcs)
+            - slot: Slot info with overall_length, center_to_center, width,
+                   perimeter, area
+            - sketch_id: The sketch the slot was added to
+            - profiles_count: Number of closed profiles in the sketch
+
+        Example:
+            # Draw a horizontal 30mm x 8mm slot
+            result = await draw_slot(
+                sketch_id="Sketch1",
+                length=30,
+                width=8
+            )
+
+            # Draw a vertical slot using center-to-center measurement
+            result = await draw_slot(
+                sketch_id="Sketch1",
+                center_x=50, center_y=0,
+                length=20,
+                width=6,
+                slot_type="center_to_center",
+                rotation_angle=90
+            )
+        """
+        logger.info(
+            "draw_slot called",
+            sketch_id=sketch_id,
+            center_x=center_x,
+            center_y=center_y,
+            length=length,
+            width=width,
+            slot_type=slot_type,
+            rotation_angle=rotation_angle,
+        )
+        async with FusionClient() as client:
+            return await client.draw_slot(
+                sketch_id=sketch_id,
+                center_x=center_x,
+                center_y=center_y,
+                length=length,
+                width=width,
+                slot_type=slot_type,
+                rotation_angle=rotation_angle,
+            )
+
+    @mcp.tool()
+    async def draw_spline(
+        sketch_id: str,
+        points: List[dict],
+        is_closed: bool = False,
+    ) -> dict:
+        """Draw a spline (smooth curve) through control points in a sketch.
+
+        Creates a fitted spline that passes smoothly through all specified
+        points. Useful for organic shapes and smooth contours.
+
+        **All coordinates in millimeters (mm).**
+
+        Args:
+            sketch_id: ID of the sketch to draw in.
+            points: List of point dicts with 'x' and 'y' coordinates in mm.
+                   Must have at least 2 points (3 for closed spline).
+                   Example: [{"x": 0, "y": 0}, {"x": 10, "y": 5}, {"x": 20, "y": 0}]
+            is_closed: If True, create a closed spline loop. Default False.
+                      Closed splines require at least 3 points.
+
+        Returns:
+            Dict containing:
+            - success: True if spline was created
+            - curve: Curve info with id, type, points, point_count, is_closed
+            - sketch_id: The sketch the spline was added to
+            - profiles_count: Number of closed profiles (for closed splines)
+
+        Example:
+            # Draw an open spline through 4 points
+            result = await draw_spline(
+                sketch_id="Sketch1",
+                points=[
+                    {"x": 0, "y": 0},
+                    {"x": 20, "y": 15},
+                    {"x": 40, "y": -10},
+                    {"x": 60, "y": 5}
+                ]
+            )
+
+            # Draw a closed spline (organic shape)
+            result = await draw_spline(
+                sketch_id="Sketch1",
+                points=[
+                    {"x": 0, "y": 20},
+                    {"x": 20, "y": 0},
+                    {"x": 0, "y": -20},
+                    {"x": -20, "y": 0}
+                ],
+                is_closed=True
+            )
+        """
+        logger.info(
+            "draw_spline called",
+            sketch_id=sketch_id,
+            point_count=len(points) if points else 0,
+            is_closed=is_closed,
+        )
+        async with FusionClient() as client:
+            return await client.draw_spline(
+                sketch_id=sketch_id,
+                points=points,
+                is_closed=is_closed,
+            )
+
+    @mcp.tool()
+    async def draw_point(
+        sketch_id: str,
+        x: float,
+        y: float,
+        is_construction: bool = False,
+    ) -> dict:
+        """Draw a point in a sketch.
+
+        Creates a sketch point that can be used as a reference for dimensions,
+        constraints, or as construction geometry for parametric designs.
+
+        **All coordinates in millimeters (mm).**
+
+        Args:
+            sketch_id: ID of the sketch to draw in.
+            x: X coordinate in mm.
+            y: Y coordinate in mm.
+            is_construction: If True, mark as construction geometry. Default False.
+                            Construction geometry is used for reference but doesn't
+                            appear in profiles for extrusion.
+
+        Returns:
+            Dict containing:
+            - success: True if point was created
+            - point: Point info with id, position, is_construction
+            - sketch_id: The sketch the point was added to
+
+        Example:
+            # Draw a reference point at the origin
+            result = await draw_point(
+                sketch_id="Sketch1",
+                x=0, y=0
+            )
+
+            # Draw a construction point for alignment
+            result = await draw_point(
+                sketch_id="Sketch1",
+                x=50, y=50,
+                is_construction=True
+            )
+        """
+        logger.info(
+            "draw_point called",
+            sketch_id=sketch_id,
+            x=x,
+            y=y,
+            is_construction=is_construction,
+        )
+        async with FusionClient() as client:
+            return await client.draw_point(
+                sketch_id=sketch_id,
+                x=x,
+                y=y,
+                is_construction=is_construction,
+            )
+
     # --- Feature Creation Tools ---
 
     @mcp.tool()

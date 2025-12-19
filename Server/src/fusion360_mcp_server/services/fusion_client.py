@@ -595,6 +595,149 @@ class FusionClient:
             "end_angle": end_angle,
         })
 
+    async def draw_polygon(
+        self,
+        sketch_id: str,
+        center_x: float,
+        center_y: float,
+        radius: float,
+        sides: int,
+        rotation_angle: float = 0.0,
+    ) -> Dict[str, Any]:
+        """Draw a regular polygon in a sketch.
+
+        Args:
+            sketch_id: ID of the sketch
+            center_x: Center X coordinate in mm
+            center_y: Center Y coordinate in mm
+            radius: Circumscribed radius in mm
+            sides: Number of sides (3-64)
+            rotation_angle: Rotation angle in degrees
+
+        Returns:
+            Dict with curve IDs and polygon info
+        """
+        return await self._request("POST", "/sketch/polygon", {
+            "sketch_id": sketch_id,
+            "center_x": center_x,
+            "center_y": center_y,
+            "radius": radius,
+            "sides": sides,
+            "rotation_angle": rotation_angle,
+        })
+
+    async def draw_ellipse(
+        self,
+        sketch_id: str,
+        center_x: float,
+        center_y: float,
+        major_radius: float,
+        minor_radius: float,
+        rotation_angle: float = 0.0,
+    ) -> Dict[str, Any]:
+        """Draw an ellipse in a sketch.
+
+        Args:
+            sketch_id: ID of the sketch
+            center_x: Center X coordinate in mm
+            center_y: Center Y coordinate in mm
+            major_radius: Major axis radius in mm
+            minor_radius: Minor axis radius in mm
+            rotation_angle: Rotation of major axis in degrees
+
+        Returns:
+            Dict with curve ID and ellipse info
+        """
+        return await self._request("POST", "/sketch/ellipse", {
+            "sketch_id": sketch_id,
+            "center_x": center_x,
+            "center_y": center_y,
+            "major_radius": major_radius,
+            "minor_radius": minor_radius,
+            "rotation_angle": rotation_angle,
+        })
+
+    async def draw_slot(
+        self,
+        sketch_id: str,
+        center_x: float,
+        center_y: float,
+        length: float,
+        width: float,
+        slot_type: str = "overall",
+        rotation_angle: float = 0.0,
+    ) -> Dict[str, Any]:
+        """Draw a slot shape in a sketch.
+
+        Args:
+            sketch_id: ID of the sketch
+            center_x: Center X coordinate in mm
+            center_y: Center Y coordinate in mm
+            length: Slot length in mm
+            width: Slot width in mm
+            slot_type: "overall" or "center_to_center"
+            rotation_angle: Rotation angle in degrees
+
+        Returns:
+            Dict with curve IDs and slot info
+        """
+        return await self._request("POST", "/sketch/slot", {
+            "sketch_id": sketch_id,
+            "center_x": center_x,
+            "center_y": center_y,
+            "length": length,
+            "width": width,
+            "slot_type": slot_type,
+            "rotation_angle": rotation_angle,
+        })
+
+    async def draw_spline(
+        self,
+        sketch_id: str,
+        points: List[Dict[str, float]],
+        is_closed: bool = False,
+    ) -> Dict[str, Any]:
+        """Draw a spline through control points in a sketch.
+
+        Args:
+            sketch_id: ID of the sketch
+            points: List of {x, y} point dicts in mm
+            is_closed: Whether to create a closed spline
+
+        Returns:
+            Dict with curve ID and spline info
+        """
+        return await self._request("POST", "/sketch/spline", {
+            "sketch_id": sketch_id,
+            "points": points,
+            "is_closed": is_closed,
+        })
+
+    async def draw_point(
+        self,
+        sketch_id: str,
+        x: float,
+        y: float,
+        is_construction: bool = False,
+    ) -> Dict[str, Any]:
+        """Draw a point in a sketch.
+
+        Args:
+            sketch_id: ID of the sketch
+            x: X coordinate in mm
+            y: Y coordinate in mm
+            is_construction: Mark as construction geometry
+
+        Returns:
+            Dict with point ID and info
+        """
+        return await self._request("POST", "/sketch/point", {
+            "sketch_id": sketch_id,
+            "x": x,
+            "y": y,
+            "is_construction": is_construction,
+        })
+
     async def extrude(
         self,
         sketch_id: str,

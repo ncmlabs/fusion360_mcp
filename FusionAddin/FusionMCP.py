@@ -49,6 +49,12 @@ from handlers.creation_handlers import (
     handle_draw_circle,
     handle_draw_rectangle,
     handle_draw_arc,
+    # Advanced sketch geometry
+    handle_draw_polygon,
+    handle_draw_ellipse,
+    handle_draw_slot,
+    handle_draw_spline,
+    handle_draw_point,
     # Feature creation
     handle_extrude,
     handle_revolve,
@@ -205,6 +211,13 @@ def _register_task_handlers() -> None:
     _event_manager.register_task_handler("draw_rectangle", handle_draw_rectangle)
     _event_manager.register_task_handler("draw_arc", handle_draw_arc)
 
+    # Phase 7a: Advanced sketch geometry handlers
+    _event_manager.register_task_handler("draw_polygon", handle_draw_polygon)
+    _event_manager.register_task_handler("draw_ellipse", handle_draw_ellipse)
+    _event_manager.register_task_handler("draw_slot", handle_draw_slot)
+    _event_manager.register_task_handler("draw_spline", handle_draw_spline)
+    _event_manager.register_task_handler("draw_point", handle_draw_point)
+
     # Phase 2: Creation handlers - Features
     _event_manager.register_task_handler("extrude", handle_extrude)
     _event_manager.register_task_handler("revolve", handle_revolve)
@@ -258,6 +271,13 @@ def _register_creation_routes() -> None:
     FusionHTTPHandler.register_route("POST", "/sketch/circle", "draw_circle")
     FusionHTTPHandler.register_route("POST", "/sketch/rectangle", "draw_rectangle")
     FusionHTTPHandler.register_route("POST", "/sketch/arc", "draw_arc")
+
+    # Phase 7a: Advanced sketch geometry routes
+    FusionHTTPHandler.register_route("POST", "/sketch/polygon", "draw_polygon")
+    FusionHTTPHandler.register_route("POST", "/sketch/ellipse", "draw_ellipse")
+    FusionHTTPHandler.register_route("POST", "/sketch/slot", "draw_slot")
+    FusionHTTPHandler.register_route("POST", "/sketch/spline", "draw_spline")
+    FusionHTTPHandler.register_route("POST", "/sketch/point", "draw_point")
 
     # Phase 2: Feature creation routes
     FusionHTTPHandler.register_route("POST", "/create/extrude", "extrude")
