@@ -754,3 +754,166 @@ class FusionClient:
             "counterbore_diameter": counterbore_diameter,
             "counterbore_depth": counterbore_depth,
         })
+
+    # --- Modification Methods ---
+
+    async def move_body(
+        self,
+        body_id: str,
+        x: float = 0.0,
+        y: float = 0.0,
+        z: float = 0.0,
+    ) -> Dict[str, Any]:
+        """Move a body by translation.
+
+        Uses defineAsTranslate to preserve parametric relationships.
+
+        Args:
+            body_id: ID of the body to move
+            x: Translation in X direction in mm
+            y: Translation in Y direction in mm
+            z: Translation in Z direction in mm
+
+        Returns:
+            Dict with success, feature info, and new position
+        """
+        return await self._request("POST", "/modify/move_body", {
+            "body_id": body_id,
+            "x": x,
+            "y": y,
+            "z": z,
+        })
+
+    async def rotate_body(
+        self,
+        body_id: str,
+        axis: str,
+        angle: float,
+        origin_x: float = 0.0,
+        origin_y: float = 0.0,
+        origin_z: float = 0.0,
+    ) -> Dict[str, Any]:
+        """Rotate a body around an axis.
+
+        Uses defineAsRotate to preserve parametric relationships.
+
+        Args:
+            body_id: ID of the body to rotate
+            axis: Axis to rotate around ("X", "Y", "Z")
+            angle: Rotation angle in degrees
+            origin_x: X coordinate of rotation origin in mm
+            origin_y: Y coordinate of rotation origin in mm
+            origin_z: Z coordinate of rotation origin in mm
+
+        Returns:
+            Dict with success, feature info, and new orientation
+        """
+        return await self._request("POST", "/modify/rotate_body", {
+            "body_id": body_id,
+            "axis": axis,
+            "angle": angle,
+            "origin_x": origin_x,
+            "origin_y": origin_y,
+            "origin_z": origin_z,
+        })
+
+    async def modify_feature(
+        self,
+        feature_id: str,
+        parameters: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Modify feature parameters.
+
+        Supports modifying extrusion distance, fillet/chamfer radius, etc.
+
+        Args:
+            feature_id: ID of the feature to modify
+            parameters: Dict of parameter names to new values
+                - For ExtrudeFeature: {"distance": float}
+                - For FilletFeature: {"radius": float}
+                - For ChamferFeature: {"distance": float}
+                - For RevolveFeature: {"angle": float}
+
+        Returns:
+            Dict with success, feature info, and old/new values
+        """
+        return await self._request("POST", "/modify/feature", {
+            "feature_id": feature_id,
+            "parameters": parameters,
+        })
+
+    async def update_parameter(
+        self,
+        name: str,
+        expression: str,
+    ) -> Dict[str, Any]:
+        """Update a parameter value.
+
+        Args:
+            name: Parameter name
+            expression: New value expression (e.g., "50 mm", "d1 * 2")
+
+        Returns:
+            Dict with success and old/new values
+        """
+        return await self._request("POST", "/modify/parameter", {
+            "name": name,
+            "expression": expression,
+        })
+
+    async def delete_body(
+        self,
+        body_id: str,
+    ) -> Dict[str, Any]:
+        """Delete a body from the design.
+
+        Args:
+            body_id: ID of the body to delete
+
+        Returns:
+            Dict with success and deleted entity info
+        """
+        return await self._request("POST", "/delete/body", {
+            "body_id": body_id,
+        })
+
+    async def delete_feature(
+        self,
+        feature_id: str,
+    ) -> Dict[str, Any]:
+        """Delete a feature from the timeline.
+
+        Args:
+            feature_id: ID of the feature to delete
+
+        Returns:
+            Dict with success, deleted feature info, and any affected features
+        """
+        return await self._request("POST", "/delete/feature", {
+            "feature_id": feature_id,
+        })
+
+    async def edit_sketch(
+        self,
+        sketch_id: str,
+        curve_id: str,
+        properties: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Edit a sketch curve.
+
+        Args:
+            sketch_id: ID of the sketch
+            curve_id: ID of the curve to modify
+            properties: Dict of properties to modify
+                - For lines: {"start_x", "start_y", "end_x", "end_y"}
+                - For circles: {"center_x", "center_y", "radius"}
+                - For arcs: {"center_x", "center_y"}
+
+        Returns:
+            Dict with success and old/new values
+        """
+        return await self._request("POST", "/modify/sketch", {
+            "sketch_id": sketch_id,
+            "curve_id": curve_id,
+            "properties": properties,
+        })
