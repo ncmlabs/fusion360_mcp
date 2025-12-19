@@ -1534,3 +1534,222 @@ class FusionClient:
         if text_position_y is not None:
             data["text_position_y"] = text_position_y
         return await self._request("POST", "/sketch/dimension", data)
+
+    # --- Phase 8a: Advanced Feature Methods ---
+
+    async def sweep(
+        self,
+        profile_sketch_id: str,
+        path_sketch_id: str,
+        profile_index: int = 0,
+        operation: str = "new_body",
+        orientation: str = "perpendicular",
+        name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Sweep a profile along a path.
+
+        Args:
+            profile_sketch_id: ID of the sketch containing the profile
+            path_sketch_id: ID of the sketch containing the sweep path
+            profile_index: Index of profile to sweep (0 for first/only)
+            operation: "new_body", "join", "cut", or "intersect"
+            orientation: "perpendicular" or "parallel"
+            name: Optional name for created body
+
+        Returns:
+            Dict with feature and body info
+        """
+        data: Dict[str, Any] = {
+            "profile_sketch_id": profile_sketch_id,
+            "path_sketch_id": path_sketch_id,
+            "profile_index": profile_index,
+            "operation": operation,
+            "orientation": orientation,
+        }
+        if name is not None:
+            data["name"] = name
+        return await self._request("POST", "/create/sweep", data)
+
+    async def loft(
+        self,
+        sketch_ids: List[str],
+        profile_indices: Optional[List[int]] = None,
+        operation: str = "new_body",
+        is_solid: bool = True,
+        is_closed: bool = False,
+        name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a loft between multiple profiles.
+
+        Args:
+            sketch_ids: List of sketch IDs (in order from start to end)
+            profile_indices: Optional list of profile indices for each sketch
+            operation: "new_body", "join", "cut", or "intersect"
+            is_solid: Create solid (True) or surface (False)
+            is_closed: Close the loft ends
+            name: Optional name for created body
+
+        Returns:
+            Dict with feature and body info
+        """
+        data: Dict[str, Any] = {
+            "sketch_ids": sketch_ids,
+            "operation": operation,
+            "is_solid": is_solid,
+            "is_closed": is_closed,
+        }
+        if profile_indices is not None:
+            data["profile_indices"] = profile_indices
+        if name is not None:
+            data["name"] = name
+        return await self._request("POST", "/create/loft", data)
+
+    async def create_sphere(
+        self,
+        radius: float,
+        x: float = 0.0,
+        y: float = 0.0,
+        z: float = 0.0,
+        name: Optional[str] = None,
+        component_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a solid sphere primitive.
+
+        Args:
+            radius: Sphere radius in mm
+            x: Center X position in mm
+            y: Center Y position in mm
+            z: Center Z position in mm
+            name: Optional name for the body
+            component_id: Optional component ID
+
+        Returns:
+            Dict with body and feature info
+        """
+        data: Dict[str, Any] = {
+            "radius": radius,
+            "x": x,
+            "y": y,
+            "z": z,
+        }
+        if name is not None:
+            data["name"] = name
+        if component_id is not None:
+            data["component_id"] = component_id
+        return await self._request("POST", "/create/sphere", data)
+
+    async def create_torus(
+        self,
+        major_radius: float,
+        minor_radius: float,
+        x: float = 0.0,
+        y: float = 0.0,
+        z: float = 0.0,
+        name: Optional[str] = None,
+        component_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a torus (donut/ring shape).
+
+        Args:
+            major_radius: Distance from center to tube center in mm
+            minor_radius: Tube radius in mm
+            x: Center X position in mm
+            y: Center Y position in mm
+            z: Center Z position in mm
+            name: Optional name for the body
+            component_id: Optional component ID
+
+        Returns:
+            Dict with body and feature info
+        """
+        data: Dict[str, Any] = {
+            "major_radius": major_radius,
+            "minor_radius": minor_radius,
+            "x": x,
+            "y": y,
+            "z": z,
+        }
+        if name is not None:
+            data["name"] = name
+        if component_id is not None:
+            data["component_id"] = component_id
+        return await self._request("POST", "/create/torus", data)
+
+    async def create_coil(
+        self,
+        diameter: float,
+        pitch: float,
+        revolutions: float,
+        section_size: float,
+        section_type: str = "circular",
+        operation: str = "new_body",
+        name: Optional[str] = None,
+        x: float = 0.0,
+        y: float = 0.0,
+        z: float = 0.0,
+        component_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a helix/spring shape (coil).
+
+        Args:
+            diameter: Coil diameter in mm
+            pitch: Distance between coils in mm
+            revolutions: Number of turns
+            section_size: Wire/section diameter in mm
+            section_type: "circular" or "square"
+            operation: "new_body", "join", "cut", "intersect"
+            name: Optional name for the body
+            x: X position in mm
+            y: Y position in mm
+            z: Z position in mm
+            component_id: Optional component ID
+
+        Returns:
+            Dict with body and feature info
+        """
+        data: Dict[str, Any] = {
+            "diameter": diameter,
+            "pitch": pitch,
+            "revolutions": revolutions,
+            "section_size": section_size,
+            "section_type": section_type,
+            "operation": operation,
+            "x": x,
+            "y": y,
+            "z": z,
+        }
+        if name is not None:
+            data["name"] = name
+        if component_id is not None:
+            data["component_id"] = component_id
+        return await self._request("POST", "/create/coil", data)
+
+    async def create_pipe(
+        self,
+        path_sketch_id: str,
+        outer_diameter: float,
+        wall_thickness: float,
+        operation: str = "new_body",
+        name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a hollow tubular shape (pipe) along a path.
+
+        Args:
+            path_sketch_id: ID of the sketch containing the path
+            outer_diameter: Outer pipe diameter in mm
+            wall_thickness: Pipe wall thickness in mm
+            operation: "new_body", "join", "cut", "intersect"
+            name: Optional name for the body
+
+        Returns:
+            Dict with body and feature info
+        """
+        data: Dict[str, Any] = {
+            "path_sketch_id": path_sketch_id,
+            "outer_diameter": outer_diameter,
+            "wall_thickness": wall_thickness,
+            "operation": operation,
+        }
+        if name is not None:
+            data["name"] = name
+        return await self._request("POST", "/create/pipe", data)

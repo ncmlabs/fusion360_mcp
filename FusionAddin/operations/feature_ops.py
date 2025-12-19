@@ -562,6 +562,781 @@ def chamfer(
         raise FeatureError("chamfer", f"Failed to apply chamfer: {str(e)}", fusion_error=str(e))
 
 
+def sweep(
+    profile_sketch_id: str,
+    path_sketch_id: str,
+    profile_index: int = 0,
+    operation: str = "new_body",
+    orientation: str = "perpendicular",
+    name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Sweep a profile along a path.
+
+    Args:
+        profile_sketch_id: ID of the sketch containing the profile
+        path_sketch_id: ID of the sketch containing the sweep path
+        profile_index: Index of profile to sweep (0 for first/only)
+        operation: "new_body", "join", "cut", or "intersect"
+        orientation: "perpendicular" or "parallel"
+        name: Optional name for created body
+
+    Returns:
+        Dict with feature_id, body_id, and geometry info
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If sketch not found
+        FeatureError: If sweep fails
+    """
+    if operation not in OPERATION_MAP:
+        raise InvalidParameterError("operation", operation, valid_values=list(OPERATION_MAP.keys()))
+
+    if orientation not in ["perpendicular", "parallel"]:
+        raise InvalidParameterError("orientation", orientation, valid_values=["perpendicular", "parallel"])
+
+    profile_sketch, component = _get_sketch(profile_sketch_id)
+    path_sketch, _ = _get_sketch(path_sketch_id)
+    registry = get_registry()
+
+    # Check for profile
+    if profile_sketch.profiles.count == 0:
+        raise FeatureError(
+            "sweep",
+            "Profile sketch has no closed profiles to sweep",
+            affected_entities=[profile_sketch_id]
+        )
+
+    if profile_index >= profile_sketch.profiles.count:
+        raise InvalidParameterError(
+            "profile_index",
+            profile_index,
+            max_value=profile_sketch.profiles.count - 1,
+            reason=f"Profile sketch has only {profile_sketch.profiles.count} profiles"
+        )
+
+    # Check for path curves
+    path_curves = path_sketch.sketchCurves
+    if path_curves.count == 0:
+        raise FeatureError(
+            "sweep",
+            "Path sketch has no curves for sweep path",
+            affected_entities=[path_sketch_id]
+        )
+
+    try:
+        profile = profile_sketch.profiles.item(profile_index)
+
+        # Get path - use first curve or a path from connected curves
+        path = None
+        # Try to create a path from sketch curves
+        if path_curves.sketchLines.count > 0:
+            path = path_curves.sketchLines.item(0)
+        elif path_curves.sketchArcs.count > 0:
+            path = path_curves.sketchArcs.item(0)
+        elif path_curves.sketchFittedSplines.count > 0:
+            path = path_curves.sketchFittedSplines.item(0)
+
+        if not path:
+            raise FeatureError("sweep", "No valid path curve found in path sketch")
+
+        # Create sweep input
+        sweeps = component.features.sweepFeatures
+        sweep_input = sweeps.createInput(profile, path, OPERATION_MAP[operation])
+
+        # Set orientation
+        if orientation == "parallel":
+            sweep_input.orientation = adsk.fusion.SweepOrientationTypes.ParallelOrientationType
+        else:
+            sweep_input.orientation = adsk.fusion.SweepOrientationTypes.PerpendicularOrientationType
+
+        # Create the sweep
+        sweep_feature = sweeps.add(sweep_input)
+
+        if not sweep_feature:
+            raise FeatureError("sweep", "Sweep operation failed")
+
+        # Register feature
+        feature_id = registry.register_feature(sweep_feature)
+
+        # Get and register created bodies
+        created_bodies = []
+        for i in range(sweep_feature.bodies.count):
+            body = sweep_feature.bodies.item(i)
+            if name and sweep_feature.bodies.count == 1:
+                body.name = name
+            registry.register_body(body)
+            created_bodies.append(body)
+
+        result = _serialize_feature_result(sweep_feature, registry, created_bodies)
+        result["success"] = True
+        result["orientation"] = orientation
+
+        return result
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("sweep", f"Failed to sweep: {str(e)}", fusion_error=str(e))
+
+
+def loft(
+    sketch_ids: List[str],
+    profile_indices: Optional[List[int]] = None,
+    operation: str = "new_body",
+    is_solid: bool = True,
+    is_closed: bool = False,
+    name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Create a loft between multiple profiles.
+
+    Args:
+        sketch_ids: List of sketch IDs (in order from start to end)
+        profile_indices: Optional list of profile indices for each sketch
+        operation: "new_body", "join", "cut", or "intersect"
+        is_solid: Create solid (True) or surface (False)
+        is_closed: Close the loft ends
+        name: Optional name for created body
+
+    Returns:
+        Dict with feature_id, body_id, and geometry info
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If sketch not found
+        FeatureError: If loft fails
+    """
+    if len(sketch_ids) < 2:
+        raise InvalidParameterError(
+            "sketch_ids", sketch_ids,
+            reason="At least 2 sketches are required for loft"
+        )
+
+    if operation not in OPERATION_MAP:
+        raise InvalidParameterError("operation", operation, valid_values=list(OPERATION_MAP.keys()))
+
+    if profile_indices is None:
+        profile_indices = [0] * len(sketch_ids)
+    elif len(profile_indices) != len(sketch_ids):
+        raise InvalidParameterError(
+            "profile_indices", profile_indices,
+            reason=f"profile_indices length ({len(profile_indices)}) must match sketch_ids length ({len(sketch_ids)})"
+        )
+
+    registry = get_registry()
+
+    # Get all sketches and profiles
+    profiles = []
+    component = None
+    for i, sketch_id in enumerate(sketch_ids):
+        sketch, comp = _get_sketch(sketch_id)
+        if component is None:
+            component = comp
+
+        if sketch.profiles.count == 0:
+            raise FeatureError(
+                "loft",
+                f"Sketch '{sketch_id}' has no closed profiles",
+                affected_entities=[sketch_id]
+            )
+
+        profile_idx = profile_indices[i]
+        if profile_idx >= sketch.profiles.count:
+            raise InvalidParameterError(
+                f"profile_indices[{i}]",
+                profile_idx,
+                max_value=sketch.profiles.count - 1,
+                reason=f"Sketch '{sketch_id}' has only {sketch.profiles.count} profiles"
+            )
+
+        profiles.append(sketch.profiles.item(profile_idx))
+
+    try:
+        # Create loft input
+        lofts = component.features.loftFeatures
+        loft_input = lofts.createInput(OPERATION_MAP[operation])
+
+        # Add profiles as loft sections
+        for profile in profiles:
+            loft_input.loftSections.add(profile)
+
+        # Set options
+        loft_input.isSolid = is_solid
+        loft_input.isClosed = is_closed
+
+        # Create the loft
+        loft_feature = lofts.add(loft_input)
+
+        if not loft_feature:
+            raise FeatureError("loft", "Loft operation failed")
+
+        # Register feature
+        feature_id = registry.register_feature(loft_feature)
+
+        # Get and register created bodies
+        created_bodies = []
+        for i in range(loft_feature.bodies.count):
+            body = loft_feature.bodies.item(i)
+            if name and loft_feature.bodies.count == 1:
+                body.name = name
+            registry.register_body(body)
+            created_bodies.append(body)
+
+        result = _serialize_feature_result(loft_feature, registry, created_bodies)
+        result["success"] = True
+        result["sections_count"] = len(profiles)
+        result["is_solid"] = is_solid
+        result["is_closed"] = is_closed
+
+        return result
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("loft", f"Failed to loft: {str(e)}", fusion_error=str(e))
+
+
+def create_sphere(
+    radius: float,
+    x: float = 0.0,
+    y: float = 0.0,
+    z: float = 0.0,
+    name: Optional[str] = None,
+    component_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Create a solid sphere primitive.
+
+    Creates a sphere by drawing a semicircle and revolving it 360 degrees.
+
+    Args:
+        radius: Sphere radius in mm
+        x: Center X position in mm
+        y: Center Y position in mm
+        z: Center Z position in mm
+        name: Optional name for the body
+        component_id: Optional component ID
+
+    Returns:
+        Dict with body and feature info
+
+    Raises:
+        InvalidParameterError: If radius is invalid
+        FeatureError: If creation fails
+    """
+    if radius <= 0:
+        raise InvalidParameterError("radius", radius, min_value=0.001)
+
+    design = _get_active_design()
+    registry = get_registry()
+
+    try:
+        # Get component
+        if component_id:
+            # Try to find component
+            component = None
+            root = design.rootComponent
+            for occurrence in root.allOccurrences:
+                if occurrence.component.name == component_id:
+                    component = occurrence.component
+                    break
+            if not component:
+                component = root
+        else:
+            component = design.rootComponent
+
+        # Convert to cm
+        radius_cm = radius / 10.0
+        x_cm = x / 10.0
+        y_cm = y / 10.0
+        z_cm = z / 10.0
+
+        # Create sketch on XY plane (offset by Z)
+        planes = component.constructionPlanes
+        sketches = component.sketches
+
+        if abs(z_cm) > 0.0001:
+            # Create offset plane
+            plane_input = planes.createInput()
+            offset = adsk.core.ValueInput.createByReal(z_cm)
+            plane_input.setByOffset(component.xYConstructionPlane, offset)
+            plane = planes.add(plane_input)
+            sketch = sketches.add(plane)
+        else:
+            sketch = sketches.add(component.xYConstructionPlane)
+
+        # Draw semicircle profile for revolve
+        # Arc from (x, y+radius) to (x, y-radius) centered at (x, y)
+        arcs = sketch.sketchCurves.sketchArcs
+        lines = sketch.sketchCurves.sketchLines
+
+        center = adsk.core.Point3D.create(x_cm, y_cm, 0)
+        start_point = adsk.core.Point3D.create(x_cm, y_cm + radius_cm, 0)
+        end_point = adsk.core.Point3D.create(x_cm, y_cm - radius_cm, 0)
+
+        # Create semicircle arc
+        arc = arcs.addByCenterStartSweep(center, start_point, math.pi)
+
+        # Close with a line (the axis)
+        axis_line = lines.addByTwoPoints(end_point, start_point)
+
+        # Get the profile
+        if sketch.profiles.count == 0:
+            raise FeatureError("create_sphere", "Failed to create sphere profile")
+
+        profile = sketch.profiles.item(0)
+
+        # Revolve around the axis line
+        revolves = component.features.revolveFeatures
+        revolve_input = revolves.createInput(
+            profile,
+            axis_line,
+            adsk.fusion.FeatureOperations.NewBodyFeatureOperation
+        )
+
+        # Full 360 degree revolve
+        revolve_input.setAngleExtent(False, adsk.core.ValueInput.createByReal(2 * math.pi))
+
+        revolve_feature = revolves.add(revolve_input)
+
+        if not revolve_feature:
+            raise FeatureError("create_sphere", "Failed to create sphere")
+
+        # Register feature
+        feature_id = registry.register_feature(revolve_feature)
+
+        # Get and register body
+        body = revolve_feature.bodies.item(0)
+        if name:
+            body.name = name
+        body_id = registry.register_body(body)
+
+        # Serialize result
+        body_serializer = BodySerializer(registry)
+
+        return {
+            "success": True,
+            "body": body_serializer.serialize_summary(body),
+            "feature": {
+                "id": feature_id,
+                "type": "SphereFeature",
+            },
+            "sphere": {
+                "center": {"x": x, "y": y, "z": z},
+                "radius": radius,
+                "diameter": radius * 2,
+                "volume": (4/3) * math.pi * (radius ** 3),
+                "surface_area": 4 * math.pi * (radius ** 2),
+            }
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("create_sphere", f"Failed to create sphere: {str(e)}", fusion_error=str(e))
+
+
+def create_torus(
+    major_radius: float,
+    minor_radius: float,
+    x: float = 0.0,
+    y: float = 0.0,
+    z: float = 0.0,
+    name: Optional[str] = None,
+    component_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Create a torus (donut/ring shape).
+
+    Creates a torus by drawing a circle and revolving it around an offset axis.
+
+    Args:
+        major_radius: Distance from center to tube center in mm
+        minor_radius: Tube radius in mm
+        x: Center X position in mm
+        y: Center Y position in mm
+        z: Center Z position in mm
+        name: Optional name for the body
+        component_id: Optional component ID
+
+    Returns:
+        Dict with body and feature info
+
+    Raises:
+        InvalidParameterError: If radii are invalid
+        FeatureError: If creation fails
+    """
+    if major_radius <= 0:
+        raise InvalidParameterError("major_radius", major_radius, min_value=0.001)
+    if minor_radius <= 0:
+        raise InvalidParameterError("minor_radius", minor_radius, min_value=0.001)
+    if minor_radius >= major_radius:
+        raise InvalidParameterError(
+            "minor_radius", minor_radius,
+            reason=f"minor_radius ({minor_radius}) must be less than major_radius ({major_radius})"
+        )
+
+    design = _get_active_design()
+    registry = get_registry()
+
+    try:
+        # Get component
+        if component_id:
+            component = None
+            root = design.rootComponent
+            for occurrence in root.allOccurrences:
+                if occurrence.component.name == component_id:
+                    component = occurrence.component
+                    break
+            if not component:
+                component = root
+        else:
+            component = design.rootComponent
+
+        # Convert to cm
+        major_cm = major_radius / 10.0
+        minor_cm = minor_radius / 10.0
+        x_cm = x / 10.0
+        y_cm = y / 10.0
+        z_cm = z / 10.0
+
+        # Create sketch on XZ plane (we'll revolve around Y axis)
+        planes = component.constructionPlanes
+        sketches = component.sketches
+
+        sketch = sketches.add(component.xZConstructionPlane)
+
+        # Draw circle at (x + major_radius, z) in XZ plane
+        circles = sketch.sketchCurves.sketchCircles
+        circle_center = adsk.core.Point3D.create(x_cm + major_cm, z_cm, 0)
+        circle = circles.addByCenterRadius(circle_center, minor_cm)
+
+        # Get the profile
+        if sketch.profiles.count == 0:
+            raise FeatureError("create_torus", "Failed to create torus profile")
+
+        profile = sketch.profiles.item(0)
+
+        # Revolve around Y axis (which is the origin axis in XZ plane view)
+        revolves = component.features.revolveFeatures
+        revolve_input = revolves.createInput(
+            profile,
+            component.yConstructionAxis,
+            adsk.fusion.FeatureOperations.NewBodyFeatureOperation
+        )
+
+        # Full 360 degree revolve
+        revolve_input.setAngleExtent(False, adsk.core.ValueInput.createByReal(2 * math.pi))
+
+        revolve_feature = revolves.add(revolve_input)
+
+        if not revolve_feature:
+            raise FeatureError("create_torus", "Failed to create torus")
+
+        # If y offset is needed, move the body
+        if abs(y_cm) > 0.0001:
+            body = revolve_feature.bodies.item(0)
+            moves = component.features.moveFeatures
+            move_input = moves.createInput2(body)
+
+            # Create translation matrix
+            transform = adsk.core.Matrix3D.create()
+            transform.translation = adsk.core.Vector3D.create(0, y_cm, 0)
+            move_input.defineAsFreeMove(transform)
+            moves.add(move_input)
+
+        # Register feature
+        feature_id = registry.register_feature(revolve_feature)
+
+        # Get and register body
+        body = revolve_feature.bodies.item(0)
+        if name:
+            body.name = name
+        body_id = registry.register_body(body)
+
+        # Serialize result
+        body_serializer = BodySerializer(registry)
+
+        # Calculate torus properties
+        volume = 2 * (math.pi ** 2) * major_radius * (minor_radius ** 2)
+        surface_area = 4 * (math.pi ** 2) * major_radius * minor_radius
+
+        return {
+            "success": True,
+            "body": body_serializer.serialize_summary(body),
+            "feature": {
+                "id": feature_id,
+                "type": "TorusFeature",
+            },
+            "torus": {
+                "center": {"x": x, "y": y, "z": z},
+                "major_radius": major_radius,
+                "minor_radius": minor_radius,
+                "volume": volume,
+                "surface_area": surface_area,
+            }
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("create_torus", f"Failed to create torus: {str(e)}", fusion_error=str(e))
+
+
+def create_coil(
+    diameter: float,
+    pitch: float,
+    revolutions: float,
+    section_size: float,
+    section_type: str = "circular",
+    operation: str = "new_body",
+    name: Optional[str] = None,
+    x: float = 0.0,
+    y: float = 0.0,
+    z: float = 0.0,
+    component_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Create a helix/spring shape (coil).
+
+    Args:
+        diameter: Coil diameter in mm
+        pitch: Distance between coils in mm
+        revolutions: Number of turns
+        section_size: Wire/section diameter in mm
+        section_type: "circular" or "square"
+        operation: "new_body", "join", "cut", "intersect"
+        name: Optional name for the body
+        x: X position in mm
+        y: Y position in mm
+        z: Z position in mm
+        component_id: Optional component ID
+
+    Returns:
+        Dict with body and feature info
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        FeatureError: If creation fails
+    """
+    if diameter <= 0:
+        raise InvalidParameterError("diameter", diameter, min_value=0.001)
+    if pitch <= 0:
+        raise InvalidParameterError("pitch", pitch, min_value=0.001)
+    if revolutions <= 0:
+        raise InvalidParameterError("revolutions", revolutions, min_value=0.001)
+    if section_size <= 0:
+        raise InvalidParameterError("section_size", section_size, min_value=0.001)
+    if section_type not in ["circular", "square"]:
+        raise InvalidParameterError("section_type", section_type, valid_values=["circular", "square"])
+    if operation not in OPERATION_MAP:
+        raise InvalidParameterError("operation", operation, valid_values=list(OPERATION_MAP.keys()))
+
+    design = _get_active_design()
+    registry = get_registry()
+
+    try:
+        # Get component
+        if component_id:
+            component = None
+            root = design.rootComponent
+            for occurrence in root.allOccurrences:
+                if occurrence.component.name == component_id:
+                    component = occurrence.component
+                    break
+            if not component:
+                component = root
+        else:
+            component = design.rootComponent
+
+        # Convert to cm
+        diameter_cm = diameter / 10.0
+        radius_cm = diameter_cm / 2.0
+        pitch_cm = pitch / 10.0
+        section_cm = section_size / 10.0
+        x_cm = x / 10.0
+        y_cm = y / 10.0
+        z_cm = z / 10.0
+
+        # Create coil feature
+        coils = component.features.coilFeatures
+
+        # Create a coil input using height and pitch mode
+        # We need to calculate height from revolutions and pitch
+        height_cm = revolutions * pitch_cm
+
+        # Create coil input
+        coil_input = coils.createInput(
+            adsk.core.ValueInput.createByReal(diameter_cm),
+            adsk.core.ValueInput.createByReal(pitch_cm),
+            adsk.core.ValueInput.createByReal(revolutions),
+            OPERATION_MAP[operation]
+        )
+
+        # Set axis to Z axis at the specified position
+        axis_point = adsk.core.Point3D.create(x_cm, y_cm, z_cm)
+        axis_direction = adsk.core.Vector3D.create(0, 0, 1)
+        coil_input.axisPoint = axis_point
+        coil_input.axisDirection = axis_direction
+
+        # Set section size
+        coil_input.sectionSize = adsk.core.ValueInput.createByReal(section_cm)
+
+        # Set section type
+        if section_type == "square":
+            coil_input.sectionType = adsk.fusion.CoilSectionTypes.SquareCoilSectionType
+        else:
+            coil_input.sectionType = adsk.fusion.CoilSectionTypes.CircularCoilSectionType
+
+        # Create the coil
+        coil_feature = coils.add(coil_input)
+
+        if not coil_feature:
+            raise FeatureError("create_coil", "Coil creation failed")
+
+        # Register feature
+        feature_id = registry.register_feature(coil_feature)
+
+        # Get and register body
+        created_bodies = []
+        for i in range(coil_feature.bodies.count):
+            body = coil_feature.bodies.item(i)
+            if name and coil_feature.bodies.count == 1:
+                body.name = name
+            registry.register_body(body)
+            created_bodies.append(body)
+
+        result = _serialize_feature_result(coil_feature, registry, created_bodies)
+        result["success"] = True
+        result["coil"] = {
+            "diameter": diameter,
+            "pitch": pitch,
+            "revolutions": revolutions,
+            "section_size": section_size,
+            "section_type": section_type,
+            "height": revolutions * pitch,
+            "position": {"x": x, "y": y, "z": z},
+        }
+
+        return result
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("create_coil", f"Failed to create coil: {str(e)}", fusion_error=str(e))
+
+
+def create_pipe(
+    path_sketch_id: str,
+    outer_diameter: float,
+    wall_thickness: float,
+    operation: str = "new_body",
+    name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Create a hollow tubular shape (pipe) along a path.
+
+    Args:
+        path_sketch_id: ID of the sketch containing the path
+        outer_diameter: Outer pipe diameter in mm
+        wall_thickness: Pipe wall thickness in mm
+        operation: "new_body", "join", "cut", "intersect"
+        name: Optional name for the body
+
+    Returns:
+        Dict with body and feature info
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If sketch not found
+        FeatureError: If creation fails
+    """
+    if outer_diameter <= 0:
+        raise InvalidParameterError("outer_diameter", outer_diameter, min_value=0.001)
+    if wall_thickness <= 0:
+        raise InvalidParameterError("wall_thickness", wall_thickness, min_value=0.001)
+    if wall_thickness >= outer_diameter / 2:
+        raise InvalidParameterError(
+            "wall_thickness", wall_thickness,
+            reason=f"wall_thickness ({wall_thickness}) must be less than half the outer_diameter ({outer_diameter/2})"
+        )
+    if operation not in OPERATION_MAP:
+        raise InvalidParameterError("operation", operation, valid_values=list(OPERATION_MAP.keys()))
+
+    path_sketch, component = _get_sketch(path_sketch_id)
+    registry = get_registry()
+
+    # Check for path curves
+    path_curves = path_sketch.sketchCurves
+    if path_curves.count == 0:
+        raise FeatureError(
+            "create_pipe",
+            "Path sketch has no curves for pipe path",
+            affected_entities=[path_sketch_id]
+        )
+
+    try:
+        # Get path - use first curve or connected curves
+        path = None
+        if path_curves.sketchLines.count > 0:
+            path = path_curves.sketchLines.item(0)
+        elif path_curves.sketchArcs.count > 0:
+            path = path_curves.sketchArcs.item(0)
+        elif path_curves.sketchFittedSplines.count > 0:
+            path = path_curves.sketchFittedSplines.item(0)
+
+        if not path:
+            raise FeatureError("create_pipe", "No valid path curve found in path sketch")
+
+        # Convert to cm
+        outer_cm = outer_diameter / 10.0
+        thickness_cm = wall_thickness / 10.0
+        inner_diameter = outer_diameter - (2 * wall_thickness)
+
+        # Use pipe feature
+        pipes = component.features.pipeFeatures
+
+        # Create pipe input
+        pipe_input = pipes.createInput(path, OPERATION_MAP[operation])
+
+        # Set diameter and wall thickness
+        pipe_input.sectionType = adsk.fusion.PipeSectionTypes.CircularPipeSectionType
+        pipe_input.sectionSize = adsk.core.ValueInput.createByReal(outer_cm)
+        pipe_input.setWall(
+            adsk.fusion.PipeWallLocationTypes.OuterWallLocation,
+            adsk.core.ValueInput.createByReal(thickness_cm)
+        )
+
+        # Create the pipe
+        pipe_feature = pipes.add(pipe_input)
+
+        if not pipe_feature:
+            raise FeatureError("create_pipe", "Pipe creation failed")
+
+        # Register feature
+        feature_id = registry.register_feature(pipe_feature)
+
+        # Get and register body
+        created_bodies = []
+        for i in range(pipe_feature.bodies.count):
+            body = pipe_feature.bodies.item(i)
+            if name and pipe_feature.bodies.count == 1:
+                body.name = name
+            registry.register_body(body)
+            created_bodies.append(body)
+
+        result = _serialize_feature_result(pipe_feature, registry, created_bodies)
+        result["success"] = True
+        result["pipe"] = {
+            "outer_diameter": outer_diameter,
+            "inner_diameter": inner_diameter,
+            "wall_thickness": wall_thickness,
+            "path_sketch_id": path_sketch_id,
+        }
+
+        return result
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("create_pipe", f"Failed to create pipe: {str(e)}", fusion_error=str(e))
+
+
 def create_hole(
     body_id: Optional[str] = None,
     face_id: Optional[str] = None,

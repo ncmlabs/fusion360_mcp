@@ -42,6 +42,12 @@ from operations.feature_ops import (
     fillet,
     chamfer,
     create_hole,
+    sweep,
+    loft,
+    create_sphere,
+    create_torus,
+    create_coil,
+    create_pipe,
 )
 from shared.exceptions import InvalidParameterError
 
@@ -1127,4 +1133,218 @@ def handle_add_dimension(args: Dict[str, Any]) -> Dict[str, Any]:
         entity2_id=args.get("entity2_id"),
         text_position_x=float(args["text_position_x"]) if "text_position_x" in args else None,
         text_position_y=float(args["text_position_y"]) if "text_position_y" in args else None,
+    )
+
+
+# --- Phase 8a: Advanced Feature Handlers ---
+
+def handle_sweep(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle sweep request.
+
+    Sweeps a profile along a path to create complex shapes.
+
+    Args:
+        args: Request arguments
+            - profile_sketch_id: ID of the sketch containing the profile (required)
+            - path_sketch_id: ID of the sketch containing the sweep path (required)
+            - profile_index: Index of profile to sweep (default 0)
+            - operation: "new_body", "join", "cut", "intersect" (default new_body)
+            - orientation: "perpendicular" or "parallel" (default perpendicular)
+            - name: Optional name for created body
+
+    Returns:
+        Dict with feature and body information
+    """
+    if "profile_sketch_id" not in args:
+        raise InvalidParameterError("profile_sketch_id", None, reason="profile_sketch_id is required")
+    if "path_sketch_id" not in args:
+        raise InvalidParameterError("path_sketch_id", None, reason="path_sketch_id is required")
+
+    return sweep(
+        profile_sketch_id=args["profile_sketch_id"],
+        path_sketch_id=args["path_sketch_id"],
+        profile_index=int(args.get("profile_index", 0)),
+        operation=args.get("operation", "new_body"),
+        orientation=args.get("orientation", "perpendicular"),
+        name=args.get("name"),
+    )
+
+
+def handle_loft(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle loft request.
+
+    Creates a smooth transition between two or more profiles.
+
+    Args:
+        args: Request arguments
+            - sketch_ids: Array of sketch IDs in order from start to end (required)
+            - profile_indices: Array of profile indices for each sketch (optional)
+            - operation: "new_body", "join", "cut", "intersect" (default new_body)
+            - is_solid: Create solid (True) or surface (False) (default True)
+            - is_closed: Close the loft ends (default False)
+            - name: Optional name for created body
+
+    Returns:
+        Dict with feature and body information
+    """
+    if "sketch_ids" not in args:
+        raise InvalidParameterError("sketch_ids", None, reason="sketch_ids is required")
+
+    sketch_ids = args["sketch_ids"]
+    if isinstance(sketch_ids, str):
+        sketch_ids = [sketch_ids]
+
+    profile_indices = args.get("profile_indices")
+    if profile_indices is not None and isinstance(profile_indices, list):
+        profile_indices = [int(idx) for idx in profile_indices]
+
+    return loft(
+        sketch_ids=sketch_ids,
+        profile_indices=profile_indices,
+        operation=args.get("operation", "new_body"),
+        is_solid=bool(args.get("is_solid", True)),
+        is_closed=bool(args.get("is_closed", False)),
+        name=args.get("name"),
+    )
+
+
+def handle_create_sphere(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle create_sphere request.
+
+    Creates a solid sphere primitive.
+
+    Args:
+        args: Request arguments
+            - radius: Sphere radius in mm (required)
+            - x: Center X position in mm (default 0)
+            - y: Center Y position in mm (default 0)
+            - z: Center Z position in mm (default 0)
+            - name: Optional name for the body
+            - component_id: Optional component ID
+
+    Returns:
+        Dict with body and feature information
+    """
+    if "radius" not in args:
+        raise InvalidParameterError("radius", None, reason="radius is required")
+
+    return create_sphere(
+        radius=float(args["radius"]),
+        x=float(args.get("x", 0)),
+        y=float(args.get("y", 0)),
+        z=float(args.get("z", 0)),
+        name=args.get("name"),
+        component_id=args.get("component_id"),
+    )
+
+
+def handle_create_torus(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle create_torus request.
+
+    Creates a torus (donut/ring shape).
+
+    Args:
+        args: Request arguments
+            - major_radius: Distance from center to tube center in mm (required)
+            - minor_radius: Tube radius in mm (required)
+            - x: Center X position in mm (default 0)
+            - y: Center Y position in mm (default 0)
+            - z: Center Z position in mm (default 0)
+            - name: Optional name for the body
+            - component_id: Optional component ID
+
+    Returns:
+        Dict with body and feature information
+    """
+    if "major_radius" not in args:
+        raise InvalidParameterError("major_radius", None, reason="major_radius is required")
+    if "minor_radius" not in args:
+        raise InvalidParameterError("minor_radius", None, reason="minor_radius is required")
+
+    return create_torus(
+        major_radius=float(args["major_radius"]),
+        minor_radius=float(args["minor_radius"]),
+        x=float(args.get("x", 0)),
+        y=float(args.get("y", 0)),
+        z=float(args.get("z", 0)),
+        name=args.get("name"),
+        component_id=args.get("component_id"),
+    )
+
+
+def handle_create_coil(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle create_coil request.
+
+    Creates a helix/spring shape.
+
+    Args:
+        args: Request arguments
+            - diameter: Coil diameter in mm (required)
+            - pitch: Distance between coils in mm (required)
+            - revolutions: Number of turns (required)
+            - section_size: Wire/section diameter in mm (required)
+            - section_type: "circular" or "square" (default circular)
+            - operation: "new_body", "join", "cut", "intersect" (default new_body)
+            - name: Optional name for the body
+            - x: X position in mm (default 0)
+            - y: Y position in mm (default 0)
+            - z: Z position in mm (default 0)
+            - component_id: Optional component ID
+
+    Returns:
+        Dict with body and feature information
+    """
+    if "diameter" not in args:
+        raise InvalidParameterError("diameter", None, reason="diameter is required")
+    if "pitch" not in args:
+        raise InvalidParameterError("pitch", None, reason="pitch is required")
+    if "revolutions" not in args:
+        raise InvalidParameterError("revolutions", None, reason="revolutions is required")
+    if "section_size" not in args:
+        raise InvalidParameterError("section_size", None, reason="section_size is required")
+
+    return create_coil(
+        diameter=float(args["diameter"]),
+        pitch=float(args["pitch"]),
+        revolutions=float(args["revolutions"]),
+        section_size=float(args["section_size"]),
+        section_type=args.get("section_type", "circular"),
+        operation=args.get("operation", "new_body"),
+        name=args.get("name"),
+        x=float(args.get("x", 0)),
+        y=float(args.get("y", 0)),
+        z=float(args.get("z", 0)),
+        component_id=args.get("component_id"),
+    )
+
+
+def handle_create_pipe(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle create_pipe request.
+
+    Creates a hollow tubular shape along a path.
+
+    Args:
+        args: Request arguments
+            - path_sketch_id: ID of the sketch containing the path (required)
+            - outer_diameter: Outer pipe diameter in mm (required)
+            - wall_thickness: Pipe wall thickness in mm (required)
+            - operation: "new_body", "join", "cut", "intersect" (default new_body)
+            - name: Optional name for the body
+
+    Returns:
+        Dict with body and feature information
+    """
+    if "path_sketch_id" not in args:
+        raise InvalidParameterError("path_sketch_id", None, reason="path_sketch_id is required")
+    if "outer_diameter" not in args:
+        raise InvalidParameterError("outer_diameter", None, reason="outer_diameter is required")
+    if "wall_thickness" not in args:
+        raise InvalidParameterError("wall_thickness", None, reason="wall_thickness is required")
+
+    return create_pipe(
+        path_sketch_id=args["path_sketch_id"],
+        outer_diameter=float(args["outer_diameter"]),
+        wall_thickness=float(args["wall_thickness"]),
+        operation=args.get("operation", "new_body"),
+        name=args.get("name"),
     )
