@@ -1305,3 +1305,232 @@ class FusionClient:
         return await self._request("POST", "/validate/sketch_status", {
             "sketch_id": sketch_id,
         })
+
+    # --- Phase 7c: Sketch Constraints & Dimensions ---
+
+    async def add_constraint_horizontal(
+        self,
+        sketch_id: str,
+        curve_id: str,
+    ) -> Dict[str, Any]:
+        """Add a horizontal constraint to a line.
+
+        Args:
+            sketch_id: ID of the sketch
+            curve_id: ID of the line to constrain
+
+        Returns:
+            Dict with constraint info and sketch status
+        """
+        return await self._request("POST", "/sketch/constraint/horizontal", {
+            "sketch_id": sketch_id,
+            "curve_id": curve_id,
+        })
+
+    async def add_constraint_vertical(
+        self,
+        sketch_id: str,
+        curve_id: str,
+    ) -> Dict[str, Any]:
+        """Add a vertical constraint to a line.
+
+        Args:
+            sketch_id: ID of the sketch
+            curve_id: ID of the line to constrain
+
+        Returns:
+            Dict with constraint info and sketch status
+        """
+        return await self._request("POST", "/sketch/constraint/vertical", {
+            "sketch_id": sketch_id,
+            "curve_id": curve_id,
+        })
+
+    async def add_constraint_coincident(
+        self,
+        sketch_id: str,
+        entity1_id: str,
+        entity2_id: str,
+    ) -> Dict[str, Any]:
+        """Add a coincident constraint between two entities.
+
+        Args:
+            sketch_id: ID of the sketch
+            entity1_id: ID of the first entity
+            entity2_id: ID of the second entity
+
+        Returns:
+            Dict with constraint info and sketch status
+        """
+        return await self._request("POST", "/sketch/constraint/coincident", {
+            "sketch_id": sketch_id,
+            "entity1_id": entity1_id,
+            "entity2_id": entity2_id,
+        })
+
+    async def add_constraint_perpendicular(
+        self,
+        sketch_id: str,
+        curve1_id: str,
+        curve2_id: str,
+    ) -> Dict[str, Any]:
+        """Add a perpendicular constraint between two lines.
+
+        Args:
+            sketch_id: ID of the sketch
+            curve1_id: ID of the first line
+            curve2_id: ID of the second line
+
+        Returns:
+            Dict with constraint info and sketch status
+        """
+        return await self._request("POST", "/sketch/constraint/perpendicular", {
+            "sketch_id": sketch_id,
+            "curve1_id": curve1_id,
+            "curve2_id": curve2_id,
+        })
+
+    async def add_constraint_parallel(
+        self,
+        sketch_id: str,
+        curve1_id: str,
+        curve2_id: str,
+    ) -> Dict[str, Any]:
+        """Add a parallel constraint between two lines.
+
+        Args:
+            sketch_id: ID of the sketch
+            curve1_id: ID of the first line
+            curve2_id: ID of the second line
+
+        Returns:
+            Dict with constraint info and sketch status
+        """
+        return await self._request("POST", "/sketch/constraint/parallel", {
+            "sketch_id": sketch_id,
+            "curve1_id": curve1_id,
+            "curve2_id": curve2_id,
+        })
+
+    async def add_constraint_tangent(
+        self,
+        sketch_id: str,
+        curve1_id: str,
+        curve2_id: str,
+    ) -> Dict[str, Any]:
+        """Add a tangent constraint between two curves.
+
+        Args:
+            sketch_id: ID of the sketch
+            curve1_id: ID of the first curve
+            curve2_id: ID of the second curve
+
+        Returns:
+            Dict with constraint info and sketch status
+        """
+        return await self._request("POST", "/sketch/constraint/tangent", {
+            "sketch_id": sketch_id,
+            "curve1_id": curve1_id,
+            "curve2_id": curve2_id,
+        })
+
+    async def add_constraint_equal(
+        self,
+        sketch_id: str,
+        curve1_id: str,
+        curve2_id: str,
+    ) -> Dict[str, Any]:
+        """Add an equal constraint between two curves.
+
+        Args:
+            sketch_id: ID of the sketch
+            curve1_id: ID of the first curve
+            curve2_id: ID of the second curve
+
+        Returns:
+            Dict with constraint info and sketch status
+        """
+        return await self._request("POST", "/sketch/constraint/equal", {
+            "sketch_id": sketch_id,
+            "curve1_id": curve1_id,
+            "curve2_id": curve2_id,
+        })
+
+    async def add_constraint_concentric(
+        self,
+        sketch_id: str,
+        curve1_id: str,
+        curve2_id: str,
+    ) -> Dict[str, Any]:
+        """Add a concentric constraint between two circles or arcs.
+
+        Args:
+            sketch_id: ID of the sketch
+            curve1_id: ID of the first circle/arc
+            curve2_id: ID of the second circle/arc
+
+        Returns:
+            Dict with constraint info and sketch status
+        """
+        return await self._request("POST", "/sketch/constraint/concentric", {
+            "sketch_id": sketch_id,
+            "curve1_id": curve1_id,
+            "curve2_id": curve2_id,
+        })
+
+    async def add_constraint_fix(
+        self,
+        sketch_id: str,
+        entity_id: str,
+    ) -> Dict[str, Any]:
+        """Fix a point or curve in place.
+
+        Args:
+            sketch_id: ID of the sketch
+            entity_id: ID of the point or curve to fix
+
+        Returns:
+            Dict with constraint info and sketch status
+        """
+        return await self._request("POST", "/sketch/constraint/fix", {
+            "sketch_id": sketch_id,
+            "entity_id": entity_id,
+        })
+
+    async def add_dimension(
+        self,
+        sketch_id: str,
+        dimension_type: str,
+        entity1_id: str,
+        value: float,
+        entity2_id: Optional[str] = None,
+        text_position_x: Optional[float] = None,
+        text_position_y: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Add a dimensional constraint to a sketch.
+
+        Args:
+            sketch_id: ID of the sketch
+            dimension_type: Type of dimension ("distance", "radius", "diameter", "angle")
+            entity1_id: ID of the first entity
+            value: Dimension value in mm or degrees
+            entity2_id: ID of second entity (for distance/angle)
+            text_position_x: Optional X position for dimension text
+            text_position_y: Optional Y position for dimension text
+
+        Returns:
+            Dict with dimension info and sketch status
+        """
+        data: Dict[str, Any] = {
+            "sketch_id": sketch_id,
+            "dimension_type": dimension_type,
+            "entity1_id": entity1_id,
+            "value": value,
+        }
+        if entity2_id is not None:
+            data["entity2_id"] = entity2_id
+        if text_position_x is not None:
+            data["text_position_x"] = text_position_x
+        if text_position_y is not None:
+            data["text_position_y"] = text_position_y
+        return await self._request("POST", "/sketch/dimension", data)

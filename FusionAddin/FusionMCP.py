@@ -61,6 +61,17 @@ from handlers.creation_handlers import (
     handle_sketch_rectangular_pattern,
     handle_project_geometry,
     handle_add_sketch_text,
+    # Phase 7c: Sketch constraints & dimensions
+    handle_add_constraint_horizontal,
+    handle_add_constraint_vertical,
+    handle_add_constraint_coincident,
+    handle_add_constraint_perpendicular,
+    handle_add_constraint_parallel,
+    handle_add_constraint_tangent,
+    handle_add_constraint_equal,
+    handle_add_constraint_concentric,
+    handle_add_constraint_fix,
+    handle_add_dimension,
     # Feature creation
     handle_extrude,
     handle_revolve,
@@ -231,6 +242,18 @@ def _register_task_handlers() -> None:
     _event_manager.register_task_handler("project_geometry", handle_project_geometry)
     _event_manager.register_task_handler("add_sketch_text", handle_add_sketch_text)
 
+    # Phase 7c: Sketch constraints & dimensions handlers
+    _event_manager.register_task_handler("add_constraint_horizontal", handle_add_constraint_horizontal)
+    _event_manager.register_task_handler("add_constraint_vertical", handle_add_constraint_vertical)
+    _event_manager.register_task_handler("add_constraint_coincident", handle_add_constraint_coincident)
+    _event_manager.register_task_handler("add_constraint_perpendicular", handle_add_constraint_perpendicular)
+    _event_manager.register_task_handler("add_constraint_parallel", handle_add_constraint_parallel)
+    _event_manager.register_task_handler("add_constraint_tangent", handle_add_constraint_tangent)
+    _event_manager.register_task_handler("add_constraint_equal", handle_add_constraint_equal)
+    _event_manager.register_task_handler("add_constraint_concentric", handle_add_constraint_concentric)
+    _event_manager.register_task_handler("add_constraint_fix", handle_add_constraint_fix)
+    _event_manager.register_task_handler("add_dimension", handle_add_dimension)
+
     # Phase 2: Creation handlers - Features
     _event_manager.register_task_handler("extrude", handle_extrude)
     _event_manager.register_task_handler("revolve", handle_revolve)
@@ -298,6 +321,18 @@ def _register_creation_routes() -> None:
     FusionHTTPHandler.register_route("POST", "/sketch/rectangular_pattern", "sketch_rectangular_pattern")
     FusionHTTPHandler.register_route("POST", "/sketch/project", "project_geometry")
     FusionHTTPHandler.register_route("POST", "/sketch/text", "add_sketch_text")
+
+    # Phase 7c: Sketch constraints & dimensions routes
+    FusionHTTPHandler.register_route("POST", "/sketch/constraint/horizontal", "add_constraint_horizontal")
+    FusionHTTPHandler.register_route("POST", "/sketch/constraint/vertical", "add_constraint_vertical")
+    FusionHTTPHandler.register_route("POST", "/sketch/constraint/coincident", "add_constraint_coincident")
+    FusionHTTPHandler.register_route("POST", "/sketch/constraint/perpendicular", "add_constraint_perpendicular")
+    FusionHTTPHandler.register_route("POST", "/sketch/constraint/parallel", "add_constraint_parallel")
+    FusionHTTPHandler.register_route("POST", "/sketch/constraint/tangent", "add_constraint_tangent")
+    FusionHTTPHandler.register_route("POST", "/sketch/constraint/equal", "add_constraint_equal")
+    FusionHTTPHandler.register_route("POST", "/sketch/constraint/concentric", "add_constraint_concentric")
+    FusionHTTPHandler.register_route("POST", "/sketch/constraint/fix", "add_constraint_fix")
+    FusionHTTPHandler.register_route("POST", "/sketch/dimension", "add_dimension")
 
     # Phase 2: Feature creation routes
     FusionHTTPHandler.register_route("POST", "/create/extrude", "extrude")

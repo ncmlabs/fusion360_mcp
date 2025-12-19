@@ -1901,3 +1901,802 @@ def add_sketch_text(
             f"Failed to add sketch text: {str(e)}",
             fusion_error=str(e)
         )
+
+
+# --- Phase 7c: Sketch Constraints & Dimensions ---
+
+
+def _get_sketch_entity(sketch: Any, entity_id: str, registry: Any) -> Any:
+    """Get a sketch entity (curve or point) by ID.
+
+    Args:
+        sketch: Fusion Sketch object
+        entity_id: Entity ID (curve_N or point_N format)
+        registry: Entity registry
+
+    Returns:
+        Fusion sketch entity (SketchCurve, SketchPoint, etc.)
+
+    Raises:
+        EntityNotFoundError: If entity not found
+    """
+    entity = registry.get_sub_entity(entity_id)
+
+    if not entity:
+        # Try to find by index from the entity_id
+        if "_curve_" in entity_id:
+            parts = entity_id.split("_curve_")
+            if len(parts) == 2:
+                try:
+                    curve_index = int(parts[1])
+                    if curve_index < sketch.sketchCurves.count:
+                        entity = sketch.sketchCurves.item(curve_index)
+                except ValueError:
+                    pass
+        elif "_point_" in entity_id:
+            parts = entity_id.split("_point_")
+            if len(parts) == 2:
+                try:
+                    point_index = int(parts[1])
+                    if point_index < sketch.sketchPoints.count:
+                        entity = sketch.sketchPoints.item(point_index)
+                except ValueError:
+                    pass
+
+    if not entity:
+        raise EntityNotFoundError("SketchEntity", entity_id, [])
+
+    return entity
+
+
+def _get_sketch_status(sketch: Any) -> Dict[str, Any]:
+    """Get the constraint status of a sketch.
+
+    Args:
+        sketch: Fusion Sketch object
+
+    Returns:
+        Dict with constraint status information
+    """
+    # Count constraint types
+    under_constrained = 0
+    fully_constrained = 0
+
+    for curve in sketch.sketchCurves:
+        if hasattr(curve, 'isFullyConstrained'):
+            if curve.isFullyConstrained:
+                fully_constrained += 1
+            else:
+                under_constrained += 1
+
+    for point in sketch.sketchPoints:
+        if hasattr(point, 'isFullyConstrained'):
+            if point.isFullyConstrained:
+                fully_constrained += 1
+            else:
+                under_constrained += 1
+
+    is_fully_constrained = under_constrained == 0 and fully_constrained > 0
+
+    return {
+        "is_fully_constrained": is_fully_constrained,
+        "under_constrained_count": under_constrained,
+        "fully_constrained_count": fully_constrained,
+        "constraints_count": sketch.geometricConstraints.count,
+        "dimensions_count": sketch.sketchDimensions.count,
+        "profiles_count": sketch.profiles.count,
+    }
+
+
+def add_constraint_horizontal(
+    sketch_id: str,
+    curve_id: str,
+) -> Dict[str, Any]:
+    """Add a horizontal constraint to a line.
+
+    Constrains a line to be horizontal (parallel to the sketch X axis).
+
+    Args:
+        sketch_id: ID of the sketch
+        curve_id: ID of the line to constrain
+
+    Returns:
+        Dict with constraint information and sketch status
+
+    Raises:
+        EntityNotFoundError: If sketch or curve not found
+        InvalidParameterError: If curve is not a line
+        FeatureError: If constraint creation fails
+    """
+    registry = get_registry()
+    sketch = _get_sketch(sketch_id)
+
+    try:
+        curve = _get_sketch_entity(sketch, curve_id, registry)
+
+        # Verify it's a line
+        if not hasattr(curve, 'startSketchPoint') or hasattr(curve, 'centerSketchPoint'):
+            raise InvalidParameterError(
+                "curve_id", curve_id,
+                reason="Horizontal constraint requires a line (not arc or circle)"
+            )
+
+        # Add horizontal constraint
+        constraints = sketch.geometricConstraints
+        constraint = constraints.addHorizontal(curve)
+
+        if not constraint:
+            raise FeatureError("horizontal_constraint", "Failed to create horizontal constraint")
+
+        # Get constraint index for ID
+        constraint_index = constraints.count - 1
+        constraint_id = f"{sketch_id}_constraint_{constraint_index}"
+
+        return {
+            "success": True,
+            "constraint": {
+                "id": constraint_id,
+                "type": "horizontal",
+                "curve_id": curve_id,
+            },
+            "sketch_id": sketch_id,
+            "sketch_status": _get_sketch_status(sketch),
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError(
+            "horizontal_constraint",
+            f"Failed to add horizontal constraint: {str(e)}",
+            fusion_error=str(e)
+        )
+
+
+def add_constraint_vertical(
+    sketch_id: str,
+    curve_id: str,
+) -> Dict[str, Any]:
+    """Add a vertical constraint to a line.
+
+    Constrains a line to be vertical (parallel to the sketch Y axis).
+
+    Args:
+        sketch_id: ID of the sketch
+        curve_id: ID of the line to constrain
+
+    Returns:
+        Dict with constraint information and sketch status
+
+    Raises:
+        EntityNotFoundError: If sketch or curve not found
+        InvalidParameterError: If curve is not a line
+        FeatureError: If constraint creation fails
+    """
+    registry = get_registry()
+    sketch = _get_sketch(sketch_id)
+
+    try:
+        curve = _get_sketch_entity(sketch, curve_id, registry)
+
+        # Verify it's a line
+        if not hasattr(curve, 'startSketchPoint') or hasattr(curve, 'centerSketchPoint'):
+            raise InvalidParameterError(
+                "curve_id", curve_id,
+                reason="Vertical constraint requires a line (not arc or circle)"
+            )
+
+        # Add vertical constraint
+        constraints = sketch.geometricConstraints
+        constraint = constraints.addVertical(curve)
+
+        if not constraint:
+            raise FeatureError("vertical_constraint", "Failed to create vertical constraint")
+
+        # Get constraint index for ID
+        constraint_index = constraints.count - 1
+        constraint_id = f"{sketch_id}_constraint_{constraint_index}"
+
+        return {
+            "success": True,
+            "constraint": {
+                "id": constraint_id,
+                "type": "vertical",
+                "curve_id": curve_id,
+            },
+            "sketch_id": sketch_id,
+            "sketch_status": _get_sketch_status(sketch),
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError(
+            "vertical_constraint",
+            f"Failed to add vertical constraint: {str(e)}",
+            fusion_error=str(e)
+        )
+
+
+def add_constraint_coincident(
+    sketch_id: str,
+    entity1_id: str,
+    entity2_id: str,
+) -> Dict[str, Any]:
+    """Add a coincident constraint between two entities.
+
+    Makes two points coincident, or places a point on a curve.
+
+    Args:
+        sketch_id: ID of the sketch
+        entity1_id: ID of the first entity (point or curve)
+        entity2_id: ID of the second entity (point or curve)
+
+    Returns:
+        Dict with constraint information and sketch status
+
+    Raises:
+        EntityNotFoundError: If sketch or entities not found
+        FeatureError: If constraint creation fails
+    """
+    registry = get_registry()
+    sketch = _get_sketch(sketch_id)
+
+    try:
+        entity1 = _get_sketch_entity(sketch, entity1_id, registry)
+        entity2 = _get_sketch_entity(sketch, entity2_id, registry)
+
+        # Add coincident constraint
+        constraints = sketch.geometricConstraints
+        constraint = constraints.addCoincident(entity1, entity2)
+
+        if not constraint:
+            raise FeatureError("coincident_constraint", "Failed to create coincident constraint")
+
+        # Get constraint index for ID
+        constraint_index = constraints.count - 1
+        constraint_id = f"{sketch_id}_constraint_{constraint_index}"
+
+        return {
+            "success": True,
+            "constraint": {
+                "id": constraint_id,
+                "type": "coincident",
+                "entity1_id": entity1_id,
+                "entity2_id": entity2_id,
+            },
+            "sketch_id": sketch_id,
+            "sketch_status": _get_sketch_status(sketch),
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError(
+            "coincident_constraint",
+            f"Failed to add coincident constraint: {str(e)}",
+            fusion_error=str(e)
+        )
+
+
+def add_constraint_perpendicular(
+    sketch_id: str,
+    curve1_id: str,
+    curve2_id: str,
+) -> Dict[str, Any]:
+    """Add a perpendicular constraint between two lines.
+
+    Makes two lines perpendicular (at 90 degrees).
+
+    Args:
+        sketch_id: ID of the sketch
+        curve1_id: ID of the first line
+        curve2_id: ID of the second line
+
+    Returns:
+        Dict with constraint information and sketch status
+
+    Raises:
+        EntityNotFoundError: If sketch or curves not found
+        FeatureError: If constraint creation fails
+    """
+    registry = get_registry()
+    sketch = _get_sketch(sketch_id)
+
+    try:
+        curve1 = _get_sketch_entity(sketch, curve1_id, registry)
+        curve2 = _get_sketch_entity(sketch, curve2_id, registry)
+
+        # Add perpendicular constraint
+        constraints = sketch.geometricConstraints
+        constraint = constraints.addPerpendicular(curve1, curve2)
+
+        if not constraint:
+            raise FeatureError("perpendicular_constraint", "Failed to create perpendicular constraint")
+
+        # Get constraint index for ID
+        constraint_index = constraints.count - 1
+        constraint_id = f"{sketch_id}_constraint_{constraint_index}"
+
+        return {
+            "success": True,
+            "constraint": {
+                "id": constraint_id,
+                "type": "perpendicular",
+                "curve1_id": curve1_id,
+                "curve2_id": curve2_id,
+            },
+            "sketch_id": sketch_id,
+            "sketch_status": _get_sketch_status(sketch),
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError(
+            "perpendicular_constraint",
+            f"Failed to add perpendicular constraint: {str(e)}",
+            fusion_error=str(e)
+        )
+
+
+def add_constraint_parallel(
+    sketch_id: str,
+    curve1_id: str,
+    curve2_id: str,
+) -> Dict[str, Any]:
+    """Add a parallel constraint between two lines.
+
+    Makes two lines parallel.
+
+    Args:
+        sketch_id: ID of the sketch
+        curve1_id: ID of the first line
+        curve2_id: ID of the second line
+
+    Returns:
+        Dict with constraint information and sketch status
+
+    Raises:
+        EntityNotFoundError: If sketch or curves not found
+        FeatureError: If constraint creation fails
+    """
+    registry = get_registry()
+    sketch = _get_sketch(sketch_id)
+
+    try:
+        curve1 = _get_sketch_entity(sketch, curve1_id, registry)
+        curve2 = _get_sketch_entity(sketch, curve2_id, registry)
+
+        # Add parallel constraint
+        constraints = sketch.geometricConstraints
+        constraint = constraints.addParallel(curve1, curve2)
+
+        if not constraint:
+            raise FeatureError("parallel_constraint", "Failed to create parallel constraint")
+
+        # Get constraint index for ID
+        constraint_index = constraints.count - 1
+        constraint_id = f"{sketch_id}_constraint_{constraint_index}"
+
+        return {
+            "success": True,
+            "constraint": {
+                "id": constraint_id,
+                "type": "parallel",
+                "curve1_id": curve1_id,
+                "curve2_id": curve2_id,
+            },
+            "sketch_id": sketch_id,
+            "sketch_status": _get_sketch_status(sketch),
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError(
+            "parallel_constraint",
+            f"Failed to add parallel constraint: {str(e)}",
+            fusion_error=str(e)
+        )
+
+
+def add_constraint_tangent(
+    sketch_id: str,
+    curve1_id: str,
+    curve2_id: str,
+) -> Dict[str, Any]:
+    """Add a tangent constraint between two curves.
+
+    Makes two curves tangent at their connection point.
+
+    Args:
+        sketch_id: ID of the sketch
+        curve1_id: ID of the first curve
+        curve2_id: ID of the second curve
+
+    Returns:
+        Dict with constraint information and sketch status
+
+    Raises:
+        EntityNotFoundError: If sketch or curves not found
+        FeatureError: If constraint creation fails
+    """
+    registry = get_registry()
+    sketch = _get_sketch(sketch_id)
+
+    try:
+        curve1 = _get_sketch_entity(sketch, curve1_id, registry)
+        curve2 = _get_sketch_entity(sketch, curve2_id, registry)
+
+        # Add tangent constraint
+        constraints = sketch.geometricConstraints
+        constraint = constraints.addTangent(curve1, curve2)
+
+        if not constraint:
+            raise FeatureError("tangent_constraint", "Failed to create tangent constraint")
+
+        # Get constraint index for ID
+        constraint_index = constraints.count - 1
+        constraint_id = f"{sketch_id}_constraint_{constraint_index}"
+
+        return {
+            "success": True,
+            "constraint": {
+                "id": constraint_id,
+                "type": "tangent",
+                "curve1_id": curve1_id,
+                "curve2_id": curve2_id,
+            },
+            "sketch_id": sketch_id,
+            "sketch_status": _get_sketch_status(sketch),
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError(
+            "tangent_constraint",
+            f"Failed to add tangent constraint: {str(e)}",
+            fusion_error=str(e)
+        )
+
+
+def add_constraint_equal(
+    sketch_id: str,
+    curve1_id: str,
+    curve2_id: str,
+) -> Dict[str, Any]:
+    """Add an equal constraint between two curves.
+
+    Makes two curves equal (same length for lines, same radius for arcs/circles).
+
+    Args:
+        sketch_id: ID of the sketch
+        curve1_id: ID of the first curve
+        curve2_id: ID of the second curve
+
+    Returns:
+        Dict with constraint information and sketch status
+
+    Raises:
+        EntityNotFoundError: If sketch or curves not found
+        FeatureError: If constraint creation fails
+    """
+    registry = get_registry()
+    sketch = _get_sketch(sketch_id)
+
+    try:
+        curve1 = _get_sketch_entity(sketch, curve1_id, registry)
+        curve2 = _get_sketch_entity(sketch, curve2_id, registry)
+
+        # Add equal constraint
+        constraints = sketch.geometricConstraints
+        constraint = constraints.addEqual(curve1, curve2)
+
+        if not constraint:
+            raise FeatureError("equal_constraint", "Failed to create equal constraint")
+
+        # Get constraint index for ID
+        constraint_index = constraints.count - 1
+        constraint_id = f"{sketch_id}_constraint_{constraint_index}"
+
+        return {
+            "success": True,
+            "constraint": {
+                "id": constraint_id,
+                "type": "equal",
+                "curve1_id": curve1_id,
+                "curve2_id": curve2_id,
+            },
+            "sketch_id": sketch_id,
+            "sketch_status": _get_sketch_status(sketch),
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError(
+            "equal_constraint",
+            f"Failed to add equal constraint: {str(e)}",
+            fusion_error=str(e)
+        )
+
+
+def add_constraint_concentric(
+    sketch_id: str,
+    curve1_id: str,
+    curve2_id: str,
+) -> Dict[str, Any]:
+    """Add a concentric constraint between two circles or arcs.
+
+    Makes two circles or arcs share the same center point.
+
+    Args:
+        sketch_id: ID of the sketch
+        curve1_id: ID of the first circle/arc
+        curve2_id: ID of the second circle/arc
+
+    Returns:
+        Dict with constraint information and sketch status
+
+    Raises:
+        EntityNotFoundError: If sketch or curves not found
+        FeatureError: If constraint creation fails
+    """
+    registry = get_registry()
+    sketch = _get_sketch(sketch_id)
+
+    try:
+        curve1 = _get_sketch_entity(sketch, curve1_id, registry)
+        curve2 = _get_sketch_entity(sketch, curve2_id, registry)
+
+        # Add concentric constraint
+        constraints = sketch.geometricConstraints
+        constraint = constraints.addConcentric(curve1, curve2)
+
+        if not constraint:
+            raise FeatureError("concentric_constraint", "Failed to create concentric constraint")
+
+        # Get constraint index for ID
+        constraint_index = constraints.count - 1
+        constraint_id = f"{sketch_id}_constraint_{constraint_index}"
+
+        return {
+            "success": True,
+            "constraint": {
+                "id": constraint_id,
+                "type": "concentric",
+                "curve1_id": curve1_id,
+                "curve2_id": curve2_id,
+            },
+            "sketch_id": sketch_id,
+            "sketch_status": _get_sketch_status(sketch),
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError(
+            "concentric_constraint",
+            f"Failed to add concentric constraint: {str(e)}",
+            fusion_error=str(e)
+        )
+
+
+def add_constraint_fix(
+    sketch_id: str,
+    entity_id: str,
+) -> Dict[str, Any]:
+    """Fix a point or curve in place.
+
+    Fixes the entity so it cannot move during constraint solving.
+
+    Args:
+        sketch_id: ID of the sketch
+        entity_id: ID of the point or curve to fix
+
+    Returns:
+        Dict with constraint information and sketch status
+
+    Raises:
+        EntityNotFoundError: If sketch or entity not found
+        FeatureError: If constraint creation fails
+    """
+    registry = get_registry()
+    sketch = _get_sketch(sketch_id)
+
+    try:
+        entity = _get_sketch_entity(sketch, entity_id, registry)
+
+        # Add fix constraint
+        constraints = sketch.geometricConstraints
+        constraint = constraints.addFix(entity)
+
+        if not constraint:
+            raise FeatureError("fix_constraint", "Failed to create fix constraint")
+
+        # Get constraint index for ID
+        constraint_index = constraints.count - 1
+        constraint_id = f"{sketch_id}_constraint_{constraint_index}"
+
+        return {
+            "success": True,
+            "constraint": {
+                "id": constraint_id,
+                "type": "fix",
+                "entity_id": entity_id,
+            },
+            "sketch_id": sketch_id,
+            "sketch_status": _get_sketch_status(sketch),
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError(
+            "fix_constraint",
+            f"Failed to add fix constraint: {str(e)}",
+            fusion_error=str(e)
+        )
+
+
+def add_dimension(
+    sketch_id: str,
+    dimension_type: str,
+    entity1_id: str,
+    value: float,
+    entity2_id: Optional[str] = None,
+    text_position_x: Optional[float] = None,
+    text_position_y: Optional[float] = None,
+) -> Dict[str, Any]:
+    """Add a dimensional constraint to a sketch.
+
+    Adds a dimension that drives geometry (changing the value moves the geometry).
+
+    Args:
+        sketch_id: ID of the sketch
+        dimension_type: Type of dimension:
+            - "distance": Distance between two points/entities or line length
+            - "radius": Radius of a circle or arc
+            - "diameter": Diameter of a circle or arc
+            - "angle": Angle between two lines
+        entity1_id: ID of the first entity
+        value: Dimension value in mm (for distance/radius/diameter) or degrees (for angle)
+        entity2_id: ID of second entity (required for distance between two entities and angle)
+        text_position_x: Optional X position for dimension text in mm
+        text_position_y: Optional Y position for dimension text in mm
+
+    Returns:
+        Dict with dimension information and sketch status
+
+    Raises:
+        InvalidParameterError: If dimension_type is invalid or value is non-positive
+        EntityNotFoundError: If sketch or entities not found
+        FeatureError: If dimension creation fails
+    """
+    valid_types = ["distance", "radius", "diameter", "angle"]
+    if dimension_type not in valid_types:
+        raise InvalidParameterError(
+            "dimension_type", dimension_type,
+            valid_values=valid_types
+        )
+
+    if value <= 0 and dimension_type != "angle":
+        raise InvalidParameterError(
+            "value", value,
+            reason=f"{dimension_type} value must be positive"
+        )
+
+    registry = get_registry()
+    sketch = _get_sketch(sketch_id)
+
+    try:
+        entity1 = _get_sketch_entity(sketch, entity1_id, registry)
+
+        # Get text position if specified, otherwise use default
+        if text_position_x is not None and text_position_y is not None:
+            text_point = adsk.core.Point3D.create(
+                text_position_x / 10.0,
+                text_position_y / 10.0,
+                0
+            )
+        else:
+            # Default text position slightly offset from entity
+            text_point = adsk.core.Point3D.create(0, 0, 0)
+
+        dimensions = sketch.sketchDimensions
+        dimension = None
+
+        if dimension_type == "distance":
+            if entity2_id:
+                # Distance between two entities
+                entity2 = _get_sketch_entity(sketch, entity2_id, registry)
+                dimension = dimensions.addDistanceDimension(
+                    entity1, entity2,
+                    adsk.fusion.DimensionOrientations.AlignedDimensionOrientation,
+                    text_point
+                )
+            else:
+                # Length of a line - use start and end points
+                if hasattr(entity1, 'startSketchPoint') and hasattr(entity1, 'endSketchPoint'):
+                    dimension = dimensions.addDistanceDimension(
+                        entity1.startSketchPoint, entity1.endSketchPoint,
+                        adsk.fusion.DimensionOrientations.AlignedDimensionOrientation,
+                        text_point
+                    )
+                else:
+                    raise InvalidParameterError(
+                        "entity1_id", entity1_id,
+                        reason="Distance dimension on single entity requires a line"
+                    )
+
+        elif dimension_type == "radius":
+            if not hasattr(entity1, 'centerSketchPoint'):
+                raise InvalidParameterError(
+                    "entity1_id", entity1_id,
+                    reason="Radius dimension requires a circle or arc"
+                )
+            dimension = dimensions.addRadialDimension(entity1, text_point)
+
+        elif dimension_type == "diameter":
+            if not hasattr(entity1, 'centerSketchPoint'):
+                raise InvalidParameterError(
+                    "entity1_id", entity1_id,
+                    reason="Diameter dimension requires a circle or arc"
+                )
+            dimension = dimensions.addDiameterDimension(entity1, text_point)
+
+        elif dimension_type == "angle":
+            if not entity2_id:
+                raise InvalidParameterError(
+                    "entity2_id", None,
+                    reason="Angle dimension requires two lines"
+                )
+            entity2 = _get_sketch_entity(sketch, entity2_id, registry)
+            dimension = dimensions.addAngularDimension(entity1, entity2, text_point)
+
+        if not dimension:
+            raise FeatureError("dimension", f"Failed to create {dimension_type} dimension")
+
+        # Set the dimension value
+        if dimension_type == "angle":
+            # Angle in radians
+            dimension.parameter.value = math.radians(value)
+        else:
+            # Distance in cm
+            dimension.parameter.value = value / 10.0
+
+        # Get dimension index for ID
+        dimension_index = dimensions.count - 1
+        dimension_id = f"{sketch_id}_dimension_{dimension_index}"
+
+        # Get the actual value after setting (may differ due to constraints)
+        if dimension_type == "angle":
+            actual_value = math.degrees(dimension.parameter.value)
+        else:
+            actual_value = dimension.parameter.value * 10.0  # Convert cm to mm
+
+        return {
+            "success": True,
+            "dimension": {
+                "id": dimension_id,
+                "type": dimension_type,
+                "entity1_id": entity1_id,
+                "entity2_id": entity2_id,
+                "requested_value": value,
+                "actual_value": actual_value,
+                "parameter_name": dimension.parameter.name,
+            },
+            "sketch_id": sketch_id,
+            "sketch_status": _get_sketch_status(sketch),
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError(
+            "dimension",
+            f"Failed to add {dimension_type} dimension: {str(e)}",
+            fusion_error=str(e)
+        )

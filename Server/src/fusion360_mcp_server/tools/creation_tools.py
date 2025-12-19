@@ -1425,4 +1425,577 @@ def register_creation_tools(mcp: FastMCP) -> None:
                 is_italic=is_italic,
             )
 
+    # --- Phase 7c: Sketch Constraints & Dimensions ---
+
+    @mcp.tool()
+    async def add_constraint_horizontal(
+        sketch_id: str,
+        curve_id: str,
+    ) -> dict:
+        """Add a horizontal constraint to a line.
+
+        Constrains a line to be horizontal (parallel to the sketch X axis).
+        The line will maintain its length but rotate to become horizontal.
+
+        **Use for:** Ensuring edges are aligned with the X axis, creating
+        level surfaces, maintaining horizontal alignment.
+
+        Args:
+            sketch_id: ID of the sketch containing the line.
+            curve_id: ID of the line to constrain. Must be a SketchLine
+                     (not a circle or arc).
+
+        Returns:
+            Dict containing:
+            - success: True if constraint was added
+            - constraint: Constraint info with id, type, curve_id
+            - sketch_id: The sketch ID
+            - sketch_status: Current constraint status including
+              is_fully_constrained, under_constrained_count
+
+        Example:
+            # Draw a rectangle and make the top edge horizontal
+            sketch = await create_sketch(plane="XY")
+            sketch_id = sketch["sketch"]["id"]
+
+            rect = await draw_rectangle(sketch_id=sketch_id, x1=0, y1=0, x2=50, y2=30)
+
+            # Get line IDs from rectangle (4 lines)
+            # Constrain top edge to be horizontal
+            result = await add_constraint_horizontal(
+                sketch_id=sketch_id,
+                curve_id=rect["curves"][0]  # Top edge
+            )
+        """
+        logger.info(
+            "add_constraint_horizontal called",
+            sketch_id=sketch_id,
+            curve_id=curve_id,
+        )
+        async with FusionClient() as client:
+            return await client.add_constraint_horizontal(
+                sketch_id=sketch_id,
+                curve_id=curve_id,
+            )
+
+    @mcp.tool()
+    async def add_constraint_vertical(
+        sketch_id: str,
+        curve_id: str,
+    ) -> dict:
+        """Add a vertical constraint to a line.
+
+        Constrains a line to be vertical (parallel to the sketch Y axis).
+        The line will maintain its length but rotate to become vertical.
+
+        **Use for:** Ensuring edges are aligned with the Y axis, creating
+        upright surfaces, maintaining vertical alignment.
+
+        Args:
+            sketch_id: ID of the sketch containing the line.
+            curve_id: ID of the line to constrain. Must be a SketchLine
+                     (not a circle or arc).
+
+        Returns:
+            Dict containing:
+            - success: True if constraint was added
+            - constraint: Constraint info with id, type, curve_id
+            - sketch_id: The sketch ID
+            - sketch_status: Current constraint status
+
+        Example:
+            # Draw a rectangle and make a side edge vertical
+            sketch = await create_sketch(plane="XY")
+            sketch_id = sketch["sketch"]["id"]
+
+            rect = await draw_rectangle(sketch_id=sketch_id, x1=0, y1=0, x2=50, y2=30)
+
+            # Constrain left edge to be vertical
+            result = await add_constraint_vertical(
+                sketch_id=sketch_id,
+                curve_id=rect["curves"][1]  # Left edge
+            )
+        """
+        logger.info(
+            "add_constraint_vertical called",
+            sketch_id=sketch_id,
+            curve_id=curve_id,
+        )
+        async with FusionClient() as client:
+            return await client.add_constraint_vertical(
+                sketch_id=sketch_id,
+                curve_id=curve_id,
+            )
+
+    @mcp.tool()
+    async def add_constraint_coincident(
+        sketch_id: str,
+        entity1_id: str,
+        entity2_id: str,
+    ) -> dict:
+        """Add a coincident constraint between two entities.
+
+        Makes two points occupy the same location, or places a point on a curve.
+        This is fundamental for connecting sketch geometry.
+
+        **Use for:** Connecting line endpoints, placing points on curves,
+        ensuring geometry meets at specific locations.
+
+        Args:
+            sketch_id: ID of the sketch containing the entities.
+            entity1_id: ID of the first entity (point or curve endpoint).
+            entity2_id: ID of the second entity (point or curve).
+
+        Returns:
+            Dict containing:
+            - success: True if constraint was added
+            - constraint: Constraint info with id, type, entity IDs
+            - sketch_id: The sketch ID
+            - sketch_status: Current constraint status
+
+        Example:
+            # Connect two lines at their endpoints
+            sketch = await create_sketch(plane="XY")
+            sketch_id = sketch["sketch"]["id"]
+
+            line1 = await draw_line(sketch_id=sketch_id, start_x=0, start_y=0, end_x=50, end_y=0)
+            line2 = await draw_line(sketch_id=sketch_id, start_x=50, start_y=0, end_x=50, end_y=30)
+
+            # Make endpoint of line1 coincident with startpoint of line2
+            # (The lines already share this point from drawing)
+        """
+        logger.info(
+            "add_constraint_coincident called",
+            sketch_id=sketch_id,
+            entity1_id=entity1_id,
+            entity2_id=entity2_id,
+        )
+        async with FusionClient() as client:
+            return await client.add_constraint_coincident(
+                sketch_id=sketch_id,
+                entity1_id=entity1_id,
+                entity2_id=entity2_id,
+            )
+
+    @mcp.tool()
+    async def add_constraint_perpendicular(
+        sketch_id: str,
+        curve1_id: str,
+        curve2_id: str,
+    ) -> dict:
+        """Add a perpendicular constraint between two lines.
+
+        Makes two lines perpendicular (at exactly 90 degrees to each other).
+        One or both lines will rotate to achieve perpendicularity.
+
+        **Use for:** Creating right angles, L-shaped brackets, rectangular
+        features, ensuring orthogonal alignment.
+
+        Args:
+            sketch_id: ID of the sketch containing the lines.
+            curve1_id: ID of the first line.
+            curve2_id: ID of the second line.
+
+        Returns:
+            Dict containing:
+            - success: True if constraint was added
+            - constraint: Constraint info with id, type, curve IDs
+            - sketch_id: The sketch ID
+            - sketch_status: Current constraint status
+
+        Example:
+            # Create two lines and make them perpendicular
+            sketch = await create_sketch(plane="XY")
+            sketch_id = sketch["sketch"]["id"]
+
+            line1 = await draw_line(sketch_id=sketch_id, start_x=0, start_y=0, end_x=50, end_y=0)
+            line2 = await draw_line(sketch_id=sketch_id, start_x=0, start_y=0, end_x=0, end_y=30)
+
+            result = await add_constraint_perpendicular(
+                sketch_id=sketch_id,
+                curve1_id=line1["curve"]["id"],
+                curve2_id=line2["curve"]["id"]
+            )
+        """
+        logger.info(
+            "add_constraint_perpendicular called",
+            sketch_id=sketch_id,
+            curve1_id=curve1_id,
+            curve2_id=curve2_id,
+        )
+        async with FusionClient() as client:
+            return await client.add_constraint_perpendicular(
+                sketch_id=sketch_id,
+                curve1_id=curve1_id,
+                curve2_id=curve2_id,
+            )
+
+    @mcp.tool()
+    async def add_constraint_parallel(
+        sketch_id: str,
+        curve1_id: str,
+        curve2_id: str,
+    ) -> dict:
+        """Add a parallel constraint between two lines.
+
+        Makes two lines parallel (same direction). One or both lines will
+        rotate to achieve parallelism while maintaining their lengths.
+
+        **Use for:** Creating parallel edges, maintaining consistent spacing,
+        ensuring features remain aligned in the same direction.
+
+        Args:
+            sketch_id: ID of the sketch containing the lines.
+            curve1_id: ID of the first line.
+            curve2_id: ID of the second line.
+
+        Returns:
+            Dict containing:
+            - success: True if constraint was added
+            - constraint: Constraint info with id, type, curve IDs
+            - sketch_id: The sketch ID
+            - sketch_status: Current constraint status
+
+        Example:
+            # Create two parallel lines (like rails)
+            sketch = await create_sketch(plane="XY")
+            sketch_id = sketch["sketch"]["id"]
+
+            line1 = await draw_line(sketch_id=sketch_id, start_x=0, start_y=0, end_x=100, end_y=0)
+            line2 = await draw_line(sketch_id=sketch_id, start_x=0, start_y=20, end_x=100, end_y=20)
+
+            result = await add_constraint_parallel(
+                sketch_id=sketch_id,
+                curve1_id=line1["curve"]["id"],
+                curve2_id=line2["curve"]["id"]
+            )
+        """
+        logger.info(
+            "add_constraint_parallel called",
+            sketch_id=sketch_id,
+            curve1_id=curve1_id,
+            curve2_id=curve2_id,
+        )
+        async with FusionClient() as client:
+            return await client.add_constraint_parallel(
+                sketch_id=sketch_id,
+                curve1_id=curve1_id,
+                curve2_id=curve2_id,
+            )
+
+    @mcp.tool()
+    async def add_constraint_tangent(
+        sketch_id: str,
+        curve1_id: str,
+        curve2_id: str,
+    ) -> dict:
+        """Add a tangent constraint between two curves.
+
+        Makes two curves tangent (smooth transition) at their connection point.
+        Commonly used for smooth transitions between lines and arcs.
+
+        **Use for:** Creating smooth curves, filleted corners, cam profiles,
+        transitions between straight and curved segments.
+
+        Args:
+            sketch_id: ID of the sketch containing the curves.
+            curve1_id: ID of the first curve (line, arc, or circle).
+            curve2_id: ID of the second curve (line, arc, or circle).
+
+        Returns:
+            Dict containing:
+            - success: True if constraint was added
+            - constraint: Constraint info with id, type, curve IDs
+            - sketch_id: The sketch ID
+            - sketch_status: Current constraint status
+
+        Example:
+            # Create a line tangent to a circle
+            sketch = await create_sketch(plane="XY")
+            sketch_id = sketch["sketch"]["id"]
+
+            circle = await draw_circle(sketch_id=sketch_id, center_x=0, center_y=0, radius=20)
+            line = await draw_line(sketch_id=sketch_id, start_x=20, start_y=0, end_x=50, end_y=10)
+
+            result = await add_constraint_tangent(
+                sketch_id=sketch_id,
+                curve1_id=circle["curve"]["id"],
+                curve2_id=line["curve"]["id"]
+            )
+        """
+        logger.info(
+            "add_constraint_tangent called",
+            sketch_id=sketch_id,
+            curve1_id=curve1_id,
+            curve2_id=curve2_id,
+        )
+        async with FusionClient() as client:
+            return await client.add_constraint_tangent(
+                sketch_id=sketch_id,
+                curve1_id=curve1_id,
+                curve2_id=curve2_id,
+            )
+
+    @mcp.tool()
+    async def add_constraint_equal(
+        sketch_id: str,
+        curve1_id: str,
+        curve2_id: str,
+    ) -> dict:
+        """Add an equal constraint between two curves.
+
+        Makes two curves equal in size (same length for lines, same radius
+        for circles/arcs). Changing one will change the other.
+
+        **Use for:** Ensuring symmetric features, matching hole sizes,
+        creating uniform spacing, maintaining equal dimensions.
+
+        Args:
+            sketch_id: ID of the sketch containing the curves.
+            curve1_id: ID of the first curve.
+            curve2_id: ID of the second curve. Must be same type as curve1.
+
+        Returns:
+            Dict containing:
+            - success: True if constraint was added
+            - constraint: Constraint info with id, type, curve IDs
+            - sketch_id: The sketch ID
+            - sketch_status: Current constraint status
+
+        Example:
+            # Create two circles with equal radius
+            sketch = await create_sketch(plane="XY")
+            sketch_id = sketch["sketch"]["id"]
+
+            circle1 = await draw_circle(sketch_id=sketch_id, center_x=-30, center_y=0, radius=15)
+            circle2 = await draw_circle(sketch_id=sketch_id, center_x=30, center_y=0, radius=10)
+
+            # Make circles equal - circle2 will resize to match circle1
+            result = await add_constraint_equal(
+                sketch_id=sketch_id,
+                curve1_id=circle1["curve"]["id"],
+                curve2_id=circle2["curve"]["id"]
+            )
+        """
+        logger.info(
+            "add_constraint_equal called",
+            sketch_id=sketch_id,
+            curve1_id=curve1_id,
+            curve2_id=curve2_id,
+        )
+        async with FusionClient() as client:
+            return await client.add_constraint_equal(
+                sketch_id=sketch_id,
+                curve1_id=curve1_id,
+                curve2_id=curve2_id,
+            )
+
+    @mcp.tool()
+    async def add_constraint_concentric(
+        sketch_id: str,
+        curve1_id: str,
+        curve2_id: str,
+    ) -> dict:
+        """Add a concentric constraint between two circles or arcs.
+
+        Makes two circles or arcs share the same center point.
+        Useful for creating rings, washers, and nested circular features.
+
+        **Use for:** Creating concentric circles, rings, washers, nested
+        holes, features that must share a common center.
+
+        Args:
+            sketch_id: ID of the sketch containing the curves.
+            curve1_id: ID of the first circle or arc.
+            curve2_id: ID of the second circle or arc.
+
+        Returns:
+            Dict containing:
+            - success: True if constraint was added
+            - constraint: Constraint info with id, type, curve IDs
+            - sketch_id: The sketch ID
+            - sketch_status: Current constraint status
+
+        Example:
+            # Create concentric circles (like a washer)
+            sketch = await create_sketch(plane="XY")
+            sketch_id = sketch["sketch"]["id"]
+
+            outer = await draw_circle(sketch_id=sketch_id, center_x=0, center_y=0, radius=20)
+            inner = await draw_circle(sketch_id=sketch_id, center_x=5, center_y=5, radius=8)
+
+            # Make circles concentric - inner will move to share center
+            result = await add_constraint_concentric(
+                sketch_id=sketch_id,
+                curve1_id=outer["curve"]["id"],
+                curve2_id=inner["curve"]["id"]
+            )
+        """
+        logger.info(
+            "add_constraint_concentric called",
+            sketch_id=sketch_id,
+            curve1_id=curve1_id,
+            curve2_id=curve2_id,
+        )
+        async with FusionClient() as client:
+            return await client.add_constraint_concentric(
+                sketch_id=sketch_id,
+                curve1_id=curve1_id,
+                curve2_id=curve2_id,
+            )
+
+    @mcp.tool()
+    async def add_constraint_fix(
+        sketch_id: str,
+        entity_id: str,
+    ) -> dict:
+        """Fix a point or curve in place.
+
+        Fixes the entity at its current position so it cannot move during
+        constraint solving. Useful for anchoring geometry.
+
+        **Use for:** Anchoring reference points, preventing geometry from
+        moving, establishing fixed positions for subsequent constraints.
+
+        Args:
+            sketch_id: ID of the sketch containing the entity.
+            entity_id: ID of the point or curve to fix.
+
+        Returns:
+            Dict containing:
+            - success: True if constraint was added
+            - constraint: Constraint info with id, type, entity_id
+            - sketch_id: The sketch ID
+            - sketch_status: Current constraint status
+
+        Example:
+            # Fix the origin point of a rectangle
+            sketch = await create_sketch(plane="XY")
+            sketch_id = sketch["sketch"]["id"]
+
+            rect = await draw_rectangle(sketch_id=sketch_id, x1=0, y1=0, x2=50, y2=30)
+
+            # Fix one corner of the rectangle
+            result = await add_constraint_fix(
+                sketch_id=sketch_id,
+                entity_id=rect["curves"][0]  # Fix first line
+            )
+        """
+        logger.info(
+            "add_constraint_fix called",
+            sketch_id=sketch_id,
+            entity_id=entity_id,
+        )
+        async with FusionClient() as client:
+            return await client.add_constraint_fix(
+                sketch_id=sketch_id,
+                entity_id=entity_id,
+            )
+
+    @mcp.tool()
+    async def add_dimension(
+        sketch_id: str,
+        dimension_type: str,
+        entity1_id: str,
+        value: float,
+        entity2_id: Optional[str] = None,
+        text_position_x: Optional[float] = None,
+        text_position_y: Optional[float] = None,
+    ) -> dict:
+        """Add a dimensional constraint to a sketch.
+
+        Adds a driving dimension that controls geometry size. Changing the
+        dimension value will update the geometry. This is the primary way
+        to create parametric, precisely-sized sketches.
+
+        **Values in mm for distance/radius/diameter, degrees for angle.**
+
+        Args:
+            sketch_id: ID of the sketch.
+            dimension_type: Type of dimension:
+                - "distance": Distance between two entities or line length
+                - "radius": Radius of a circle or arc
+                - "diameter": Diameter of a circle or arc
+                - "angle": Angle between two lines
+            entity1_id: ID of the first entity.
+            value: Dimension value in mm (distance/radius/diameter) or
+                  degrees (angle). Must be positive for non-angle types.
+            entity2_id: ID of second entity. Required for:
+                       - distance between two separate entities
+                       - angle between two lines
+                       Not needed for:
+                       - line length (uses line endpoints)
+                       - radius/diameter (uses circle/arc)
+            text_position_x: Optional X position for dimension text in mm.
+            text_position_y: Optional Y position for dimension text in mm.
+
+        Returns:
+            Dict containing:
+            - success: True if dimension was added
+            - dimension: Dimension info with id, type, entity IDs,
+              requested_value, actual_value, parameter_name
+            - sketch_id: The sketch ID
+            - sketch_status: Current constraint status
+
+        Example:
+            # Add dimensions to a rectangle to make it exactly 50x30mm
+            sketch = await create_sketch(plane="XY")
+            sketch_id = sketch["sketch"]["id"]
+
+            rect = await draw_rectangle(sketch_id=sketch_id, x1=0, y1=0, x2=40, y2=25)
+            # rect["curves"] contains 4 line IDs
+
+            # Add horizontal dimension (width = 50mm)
+            await add_dimension(
+                sketch_id=sketch_id,
+                dimension_type="distance",
+                entity1_id=rect["curves"][0],  # Top line
+                value=50
+            )
+
+            # Add vertical dimension (height = 30mm)
+            await add_dimension(
+                sketch_id=sketch_id,
+                dimension_type="distance",
+                entity1_id=rect["curves"][1],  # Left line
+                value=30
+            )
+
+            # Add radius dimension to a circle
+            circle = await draw_circle(sketch_id=sketch_id, center_x=25, center_y=15, radius=8)
+            await add_dimension(
+                sketch_id=sketch_id,
+                dimension_type="diameter",
+                entity1_id=circle["curve"]["id"],
+                value=20  # 20mm diameter (10mm radius)
+            )
+
+            # Add angle dimension between two lines
+            await add_dimension(
+                sketch_id=sketch_id,
+                dimension_type="angle",
+                entity1_id=rect["curves"][0],
+                entity2_id=rect["curves"][1],
+                value=90  # 90 degrees
+            )
+        """
+        logger.info(
+            "add_dimension called",
+            sketch_id=sketch_id,
+            dimension_type=dimension_type,
+            entity1_id=entity1_id,
+            value=value,
+            entity2_id=entity2_id,
+        )
+        async with FusionClient() as client:
+            return await client.add_dimension(
+                sketch_id=sketch_id,
+                dimension_type=dimension_type,
+                entity1_id=entity1_id,
+                value=value,
+                entity2_id=entity2_id,
+                text_position_x=text_position_x,
+                text_position_y=text_position_y,
+            )
+
     logger.info("Creation tools registered")

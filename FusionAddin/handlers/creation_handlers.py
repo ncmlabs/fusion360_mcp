@@ -24,6 +24,17 @@ from operations.sketch_ops import (
     sketch_rectangular_pattern,
     project_geometry,
     add_sketch_text,
+    # Phase 7c: Sketch Constraints & Dimensions
+    add_constraint_horizontal,
+    add_constraint_vertical,
+    add_constraint_coincident,
+    add_constraint_perpendicular,
+    add_constraint_parallel,
+    add_constraint_tangent,
+    add_constraint_equal,
+    add_constraint_concentric,
+    add_constraint_fix,
+    add_dimension,
 )
 from operations.feature_ops import (
     extrude,
@@ -832,4 +843,284 @@ def handle_add_sketch_text(args: Dict[str, Any]) -> Dict[str, Any]:
         font_name=args.get("font_name"),
         is_bold=bool(args.get("is_bold", False)),
         is_italic=bool(args.get("is_italic", False)),
+    )
+
+
+# --- Phase 7c: Sketch Constraints & Dimensions Handlers ---
+
+def handle_add_constraint_horizontal(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle add_constraint_horizontal request.
+
+    Constrains a line to be horizontal.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch (required)
+            - curve_id: ID of the line to constrain (required)
+
+    Returns:
+        Dict with constraint information and sketch status
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "curve_id" not in args:
+        raise InvalidParameterError("curve_id", None, reason="curve_id is required")
+
+    return add_constraint_horizontal(
+        sketch_id=args["sketch_id"],
+        curve_id=args["curve_id"],
+    )
+
+
+def handle_add_constraint_vertical(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle add_constraint_vertical request.
+
+    Constrains a line to be vertical.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch (required)
+            - curve_id: ID of the line to constrain (required)
+
+    Returns:
+        Dict with constraint information and sketch status
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "curve_id" not in args:
+        raise InvalidParameterError("curve_id", None, reason="curve_id is required")
+
+    return add_constraint_vertical(
+        sketch_id=args["sketch_id"],
+        curve_id=args["curve_id"],
+    )
+
+
+def handle_add_constraint_coincident(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle add_constraint_coincident request.
+
+    Makes two points coincident, or places a point on a curve.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch (required)
+            - entity1_id: ID of the first entity (required)
+            - entity2_id: ID of the second entity (required)
+
+    Returns:
+        Dict with constraint information and sketch status
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "entity1_id" not in args:
+        raise InvalidParameterError("entity1_id", None, reason="entity1_id is required")
+    if "entity2_id" not in args:
+        raise InvalidParameterError("entity2_id", None, reason="entity2_id is required")
+
+    return add_constraint_coincident(
+        sketch_id=args["sketch_id"],
+        entity1_id=args["entity1_id"],
+        entity2_id=args["entity2_id"],
+    )
+
+
+def handle_add_constraint_perpendicular(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle add_constraint_perpendicular request.
+
+    Makes two lines perpendicular (at 90 degrees).
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch (required)
+            - curve1_id: ID of the first line (required)
+            - curve2_id: ID of the second line (required)
+
+    Returns:
+        Dict with constraint information and sketch status
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "curve1_id" not in args:
+        raise InvalidParameterError("curve1_id", None, reason="curve1_id is required")
+    if "curve2_id" not in args:
+        raise InvalidParameterError("curve2_id", None, reason="curve2_id is required")
+
+    return add_constraint_perpendicular(
+        sketch_id=args["sketch_id"],
+        curve1_id=args["curve1_id"],
+        curve2_id=args["curve2_id"],
+    )
+
+
+def handle_add_constraint_parallel(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle add_constraint_parallel request.
+
+    Makes two lines parallel.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch (required)
+            - curve1_id: ID of the first line (required)
+            - curve2_id: ID of the second line (required)
+
+    Returns:
+        Dict with constraint information and sketch status
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "curve1_id" not in args:
+        raise InvalidParameterError("curve1_id", None, reason="curve1_id is required")
+    if "curve2_id" not in args:
+        raise InvalidParameterError("curve2_id", None, reason="curve2_id is required")
+
+    return add_constraint_parallel(
+        sketch_id=args["sketch_id"],
+        curve1_id=args["curve1_id"],
+        curve2_id=args["curve2_id"],
+    )
+
+
+def handle_add_constraint_tangent(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle add_constraint_tangent request.
+
+    Makes two curves tangent at their connection point.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch (required)
+            - curve1_id: ID of the first curve (required)
+            - curve2_id: ID of the second curve (required)
+
+    Returns:
+        Dict with constraint information and sketch status
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "curve1_id" not in args:
+        raise InvalidParameterError("curve1_id", None, reason="curve1_id is required")
+    if "curve2_id" not in args:
+        raise InvalidParameterError("curve2_id", None, reason="curve2_id is required")
+
+    return add_constraint_tangent(
+        sketch_id=args["sketch_id"],
+        curve1_id=args["curve1_id"],
+        curve2_id=args["curve2_id"],
+    )
+
+
+def handle_add_constraint_equal(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle add_constraint_equal request.
+
+    Makes two curves equal (same length for lines, same radius for arcs/circles).
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch (required)
+            - curve1_id: ID of the first curve (required)
+            - curve2_id: ID of the second curve (required)
+
+    Returns:
+        Dict with constraint information and sketch status
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "curve1_id" not in args:
+        raise InvalidParameterError("curve1_id", None, reason="curve1_id is required")
+    if "curve2_id" not in args:
+        raise InvalidParameterError("curve2_id", None, reason="curve2_id is required")
+
+    return add_constraint_equal(
+        sketch_id=args["sketch_id"],
+        curve1_id=args["curve1_id"],
+        curve2_id=args["curve2_id"],
+    )
+
+
+def handle_add_constraint_concentric(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle add_constraint_concentric request.
+
+    Makes two circles or arcs share the same center point.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch (required)
+            - curve1_id: ID of the first circle/arc (required)
+            - curve2_id: ID of the second circle/arc (required)
+
+    Returns:
+        Dict with constraint information and sketch status
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "curve1_id" not in args:
+        raise InvalidParameterError("curve1_id", None, reason="curve1_id is required")
+    if "curve2_id" not in args:
+        raise InvalidParameterError("curve2_id", None, reason="curve2_id is required")
+
+    return add_constraint_concentric(
+        sketch_id=args["sketch_id"],
+        curve1_id=args["curve1_id"],
+        curve2_id=args["curve2_id"],
+    )
+
+
+def handle_add_constraint_fix(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle add_constraint_fix request.
+
+    Fixes a point or curve in place.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch (required)
+            - entity_id: ID of the point or curve to fix (required)
+
+    Returns:
+        Dict with constraint information and sketch status
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "entity_id" not in args:
+        raise InvalidParameterError("entity_id", None, reason="entity_id is required")
+
+    return add_constraint_fix(
+        sketch_id=args["sketch_id"],
+        entity_id=args["entity_id"],
+    )
+
+
+def handle_add_dimension(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle add_dimension request.
+
+    Adds a dimensional constraint to a sketch.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch (required)
+            - dimension_type: Type of dimension - "distance", "radius", "diameter", "angle" (required)
+            - entity1_id: ID of the first entity (required)
+            - value: Dimension value in mm or degrees (required)
+            - entity2_id: ID of second entity (required for distance between two entities and angle)
+            - text_position_x: Optional X position for dimension text in mm
+            - text_position_y: Optional Y position for dimension text in mm
+
+    Returns:
+        Dict with dimension information and sketch status
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "dimension_type" not in args:
+        raise InvalidParameterError("dimension_type", None, reason="dimension_type is required")
+    if "entity1_id" not in args:
+        raise InvalidParameterError("entity1_id", None, reason="entity1_id is required")
+    if "value" not in args:
+        raise InvalidParameterError("value", None, reason="value is required")
+
+    return add_dimension(
+        sketch_id=args["sketch_id"],
+        dimension_type=args["dimension_type"],
+        entity1_id=args["entity1_id"],
+        value=float(args["value"]),
+        entity2_id=args.get("entity2_id"),
+        text_position_x=float(args["text_position_x"]) if "text_position_x" in args else None,
+        text_position_y=float(args["text_position_y"]) if "text_position_y" in args else None,
     )
