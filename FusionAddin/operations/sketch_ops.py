@@ -1024,13 +1024,17 @@ def draw_spline(
 
         # Draw spline
         splines = sketch.sketchCurves.sketchFittedSplines
-        if is_closed:
-            spline = splines.addByInterpolation(point_collection, True)
-        else:
-            spline = splines.add(point_collection)
+        spline = splines.add(point_collection)
 
         if not spline:
             raise FeatureError("spline", "Failed to create spline")
+
+        # Close the spline if requested
+        if is_closed:
+            spline.isClosed = True
+            # Force profile recalculation
+            sketch.isComputeDeferred = True
+            sketch.isComputeDeferred = False
 
         # Register and get ID
         curve_index = sketch.sketchCurves.count - 1
