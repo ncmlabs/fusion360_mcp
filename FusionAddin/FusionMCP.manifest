@@ -1,0 +1,13 @@
+{
+    "autodeskProduct": "Fusion",
+    "type": "addin",
+    "id": "fusion360-mcp-addin",
+    "author": "NCM Labs",
+    "description": {
+        "": "MCP Add-in for AI-assisted CAD design in Fusion 360"
+    },
+    "version": "0.1.0",
+    "runOnStartup": true,
+    "supportedOS": "windows|mac",
+    "editEnabled": true
+}
