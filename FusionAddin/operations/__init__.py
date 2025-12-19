@@ -32,6 +32,19 @@ from .modification_ops import (
     delete_feature,
     edit_sketch,
 )
+from .assembly_ops import (
+    create_component,
+    get_components,
+    get_component_by_id,
+    activate_component,
+    get_occurrences,
+    move_occurrence,
+    create_joint,
+    create_joint_between_occurrences,
+    get_joints,
+    get_joint_by_id,
+    get_component_bodies,
+)
 
 __all__ = [
     # Body operations
@@ -57,4 +70,16 @@ __all__ = [
     "delete_body",
     "delete_feature",
     "edit_sketch",
+    # Assembly operations
+    "create_component",
+    "get_components",
+    "get_component_by_id",
+    "activate_component",
+    "get_occurrences",
+    "move_occurrence",
+    "create_joint",
+    "create_joint_between_occurrences",
+    "get_joints",
+    "get_joint_by_id",
+    "get_component_bodies",
 ]
