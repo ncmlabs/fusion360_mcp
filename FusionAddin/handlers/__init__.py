@@ -28,6 +28,16 @@ from .creation_handlers import (
     handle_create_hole,
 )
 
+from .modification_handlers import (
+    handle_move_body,
+    handle_rotate_body,
+    handle_modify_feature,
+    handle_update_parameter,
+    handle_delete_body,
+    handle_delete_feature,
+    handle_edit_sketch,
+)
+
 __all__ = [
     # Query handlers
     "handle_get_design_state",
@@ -52,4 +62,12 @@ __all__ = [
     "handle_fillet",
     "handle_chamfer",
     "handle_create_hole",
+    # Modification handlers
+    "handle_move_body",
+    "handle_rotate_body",
+    "handle_modify_feature",
+    "handle_update_parameter",
+    "handle_delete_body",
+    "handle_delete_feature",
+    "handle_edit_sketch",
 ]

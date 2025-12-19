@@ -57,6 +57,17 @@ from handlers.creation_handlers import (
     handle_create_hole,
 )
 
+# Import modification handlers
+from handlers.modification_handlers import (
+    handle_move_body,
+    handle_rotate_body,
+    handle_modify_feature,
+    handle_update_parameter,
+    handle_delete_body,
+    handle_delete_feature,
+    handle_edit_sketch,
+)
+
 
 # Global state
 _app: Optional[Any] = None
@@ -101,6 +112,7 @@ def run(context: Dict[str, Any]) -> None:
         setup_default_routes()
         _register_query_routes()
         _register_creation_routes()
+        _register_modification_routes()
 
         # Start HTTP server
         config = ServerConfig(host=HTTP_HOST, port=HTTP_PORT)
@@ -190,6 +202,15 @@ def _register_task_handlers() -> None:
     _event_manager.register_task_handler("chamfer", handle_chamfer)
     _event_manager.register_task_handler("create_hole", handle_create_hole)
 
+    # Phase 3: Modification handlers
+    _event_manager.register_task_handler("move_body", handle_move_body)
+    _event_manager.register_task_handler("rotate_body", handle_rotate_body)
+    _event_manager.register_task_handler("modify_feature", handle_modify_feature)
+    _event_manager.register_task_handler("update_parameter", handle_update_parameter)
+    _event_manager.register_task_handler("delete_body", handle_delete_body)
+    _event_manager.register_task_handler("delete_feature", handle_delete_feature)
+    _event_manager.register_task_handler("edit_sketch", handle_edit_sketch)
+
 
 def _register_query_routes() -> None:
     """Register HTTP routes for query endpoints."""
@@ -227,6 +248,24 @@ def _register_creation_routes() -> None:
     FusionHTTPHandler.register_route("POST", "/create/fillet", "fillet")
     FusionHTTPHandler.register_route("POST", "/create/chamfer", "chamfer")
     FusionHTTPHandler.register_route("POST", "/create/hole", "create_hole")
+
+
+def _register_modification_routes() -> None:
+    """Register HTTP routes for modification endpoints."""
+    # Phase 3: Move/Rotate routes
+    FusionHTTPHandler.register_route("POST", "/modify/move_body", "move_body")
+    FusionHTTPHandler.register_route("POST", "/modify/rotate_body", "rotate_body")
+
+    # Phase 3: Feature modification routes
+    FusionHTTPHandler.register_route("POST", "/modify/feature", "modify_feature")
+    FusionHTTPHandler.register_route("POST", "/modify/parameter", "update_parameter")
+
+    # Phase 3: Delete routes
+    FusionHTTPHandler.register_route("POST", "/delete/body", "delete_body")
+    FusionHTTPHandler.register_route("POST", "/delete/feature", "delete_feature")
+
+    # Phase 3: Sketch edit routes
+    FusionHTTPHandler.register_route("POST", "/modify/sketch", "edit_sketch")
 
 
 def _show_message(message: str) -> None:

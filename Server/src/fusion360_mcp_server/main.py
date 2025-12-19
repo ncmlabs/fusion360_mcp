@@ -5,7 +5,7 @@ from mcp.server.fastmcp import FastMCP
 
 from .config import get_config
 from .logging import setup_logging, get_logger
-from .tools import register_query_tools, register_creation_tools
+from .tools import register_query_tools, register_creation_tools, register_modification_tools
 
 
 # Create FastMCP server instance
@@ -28,6 +28,14 @@ CREATION WORKFLOW:
 3. Apply edge modifications with fillet() or chamfer()
 4. Add holes with create_hole()
 
+MODIFICATION WORKFLOW:
+1. Move bodies with move_body() - preserves parametric relationships
+2. Rotate bodies with rotate_body() - preserves parametric relationships
+3. Change feature dimensions with modify_feature() (e.g., extrusion distance)
+4. Update design parameters with update_parameter() for dynamic changes
+5. Delete bodies with delete_body() or features with delete_feature()
+6. Edit sketch curves with edit_sketch() to modify geometry
+
 IMPORTANT:
 - All dimensions are in millimeters (mm)
 - Always query the design state before making changes
@@ -35,6 +43,8 @@ IMPORTANT:
 - Check body.is_solid to know if you're working with solid or surface geometry
 - Check sketch.is_fully_constrained to know if a sketch is ready for extrusion
 - For fillet/chamfer, get edge IDs using get_body_by_id with include_edges=True
+- move_body and rotate_body use parametric operations that preserve design history
+- Use update_parameter to change dimensions via expressions like "50 mm" or "d1 * 2"
 """,
 )
 
@@ -79,6 +89,9 @@ def main() -> None:
 
     register_creation_tools(mcp)
     logger.info("Creation tools registered")
+
+    register_modification_tools(mcp)
+    logger.info("Modification tools registered")
 
     # Determine transport
     transport = args.transport or config.server_transport

@@ -23,6 +23,15 @@ from .feature_ops import (
     chamfer,
     create_hole,
 )
+from .modification_ops import (
+    move_body,
+    rotate_body,
+    modify_feature,
+    update_parameter,
+    delete_body,
+    delete_feature,
+    edit_sketch,
+)
 
 __all__ = [
     # Body operations
@@ -40,4 +49,12 @@ __all__ = [
     "fillet",
     "chamfer",
     "create_hole",
+    # Modification operations
+    "move_body",
+    "rotate_body",
+    "modify_feature",
+    "update_parameter",
+    "delete_body",
+    "delete_feature",
+    "edit_sketch",
 ]
