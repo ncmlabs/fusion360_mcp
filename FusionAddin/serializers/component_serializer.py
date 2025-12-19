@@ -65,7 +65,7 @@ class ComponentSerializer(BaseSerializer):
         return {
             "id": comp_id,
             "name": self.safe_get(component, 'name', comp_id),
-            "is_root": self.safe_get(component, 'isRootComponent', False),
+            "is_root": self._is_root_component(component),
             "is_active": self._is_component_active(component),
             "bodies_count": bodies_count,
             "sketches_count": sketches_count,
@@ -233,6 +233,24 @@ class ComponentSerializer(BaseSerializer):
 
     # --- Private Helpers ---
 
+    def _is_root_component(self, component: FusionObject) -> bool:
+        """Check if component is the root component.
+
+        Args:
+            component: Fusion Component object
+
+        Returns:
+            True if this is the root component
+        """
+        try:
+            parent_design = getattr(component, 'parentDesign', None)
+            if parent_design:
+                root = getattr(parent_design, 'rootComponent', None)
+                return component == root
+        except Exception:
+            pass
+        return False
+
     def _is_component_active(self, component: FusionObject) -> bool:
         """Check if component is the active component.
 
@@ -263,7 +281,7 @@ class ComponentSerializer(BaseSerializer):
         """
         try:
             # Root component has no parent
-            if self.safe_get(component, 'isRootComponent', False):
+            if self._is_root_component(component):
                 return None
 
             # Try to get parent occurrence's component

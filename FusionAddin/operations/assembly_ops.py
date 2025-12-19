@@ -187,20 +187,23 @@ def get_components() -> Dict[str, Any]:
     components = []
 
     # Add root component
+    root_id = registry.register_component(root)
     components.append(serializer.serialize_component_summary(root))
 
-    # Add all unique components from occurrences
-    seen_components = {root}
+    # Add all unique components from occurrences (track by ID)
+    seen_ids = {root_id}
 
     def collect_components(parent_component):
         occurrences = parent_component.occurrences
         if occurrences:
             for occ in occurrences:
                 comp = occ.component
-                if comp and comp not in seen_components:
-                    seen_components.add(comp)
-                    components.append(serializer.serialize_component_summary(comp))
-                    collect_components(comp)
+                if comp:
+                    comp_id = registry.register_component(comp)
+                    if comp_id not in seen_ids:
+                        seen_ids.add(comp_id)
+                        components.append(serializer.serialize_component_summary(comp))
+                        collect_components(comp)
 
     collect_components(root)
 
@@ -245,6 +248,9 @@ def activate_component(component_id: str) -> Dict[str, Any]:
     Sets the specified component as the active component,
     making it the target for new geometry and features.
 
+    Note: In Fusion 360 API, activate() is on Occurrence, not Component.
+    We find an occurrence of the component and activate it.
+
     Args:
         component_id: Component ID to activate
 
@@ -257,6 +263,7 @@ def activate_component(component_id: str) -> Dict[str, Any]:
     """
     design = _get_active_design()
     registry = get_registry()
+    root = design.rootComponent
 
     component = registry.get_component(component_id)
     if not component:
@@ -264,8 +271,27 @@ def activate_component(component_id: str) -> Dict[str, Any]:
         raise EntityNotFoundError("Component", component_id, available)
 
     try:
-        # Activate the component
-        result = design.activateRootComponent() if component.isRootComponent else component.activate()
+        # Check if this is the root component
+        is_root = (component == root)
+
+        if is_root:
+            # Activate root component
+            result = design.activateRootComponent()
+        else:
+            # Find an occurrence of this component and activate it
+            occurrence = None
+            for occ in root.allOccurrences:
+                if occ.component == component:
+                    occurrence = occ
+                    break
+
+            if not occurrence:
+                raise FeatureError(
+                    "activate_component",
+                    f"No occurrence found for component '{component_id}'"
+                )
+
+            result = occurrence.activate()
 
         if result is False:
             raise FeatureError(
@@ -572,15 +598,11 @@ def create_joint_between_occurrences(
         raise EntityNotFoundError("Occurrence", occurrence2_id, available)
 
     try:
-        # Get the joints collection
-        joints = root.joints
+        # Use As-Built Joints API which accepts occurrences directly
+        as_built_joints = root.asBuiltJoints
 
-        # Create joint geometry from occurrence origins
-        geo1 = adsk.fusion.JointGeometry.createByPoint(occurrence1, adsk.core.Point3D.create(0, 0, 0))
-        geo2 = adsk.fusion.JointGeometry.createByPoint(occurrence2, adsk.core.Point3D.create(0, 0, 0))
-
-        # Create joint input
-        joint_input = joints.createInput(geo1, geo2)
+        # Create as-built joint input (occurrence1, occurrence2, geometry=None)
+        joint_input = as_built_joints.createInput(occurrence1, occurrence2, None)
 
         # Set joint type
         joint_type_lower = joint_type.lower()
@@ -603,7 +625,7 @@ def create_joint_between_occurrences(
             joint_input.setAsBallJointMotion()
 
         # Create the joint
-        joint = joints.add(joint_input)
+        joint = as_built_joints.add(joint_input)
 
         if not joint:
             raise FeatureError(
