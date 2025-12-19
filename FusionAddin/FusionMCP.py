@@ -4,6 +4,13 @@ This add-in provides an HTTP interface for the MCP server to communicate
 with Fusion 360, enabling AI-assisted CAD design.
 """
 
+# Add the add-in folder to sys.path for local module imports
+import os
+import sys
+_ADDIN_PATH = os.path.dirname(os.path.abspath(__file__))
+if _ADDIN_PATH not in sys.path:
+    sys.path.insert(0, _ADDIN_PATH)
+
 # Fusion 360 API imports - these are only available when running in Fusion
 try:
     import adsk.core
