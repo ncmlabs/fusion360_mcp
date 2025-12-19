@@ -13,6 +13,11 @@ from operations.sketch_ops import (
     draw_circle,
     draw_rectangle,
     draw_arc,
+    draw_polygon,
+    draw_ellipse,
+    draw_slot,
+    draw_spline,
+    draw_point,
 )
 from operations.feature_ops import (
     extrude,
@@ -471,4 +476,170 @@ def handle_create_hole(args: Dict[str, Any]) -> Dict[str, Any]:
         countersink_diameter=float(args.get("countersink_diameter", 0)),
         counterbore_diameter=float(args.get("counterbore_diameter", 0)),
         counterbore_depth=float(args.get("counterbore_depth", 0)),
+    )
+
+
+# --- Advanced Sketch Geometry Handlers ---
+
+def handle_draw_polygon(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle draw_polygon request.
+
+    Draws a regular polygon in a sketch.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch (required)
+            - center_x: Center X coordinate in mm (default 0)
+            - center_y: Center Y coordinate in mm (default 0)
+            - radius: Circumscribed radius in mm (required)
+            - sides: Number of sides 3-64 (required)
+            - rotation_angle: Rotation angle in degrees (default 0)
+
+    Returns:
+        Dict with curve IDs and polygon information
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "radius" not in args:
+        raise InvalidParameterError("radius", None, reason="radius is required")
+    if "sides" not in args:
+        raise InvalidParameterError("sides", None, reason="sides is required")
+
+    return draw_polygon(
+        sketch_id=args["sketch_id"],
+        center_x=float(args.get("center_x", 0)),
+        center_y=float(args.get("center_y", 0)),
+        radius=float(args["radius"]),
+        sides=int(args["sides"]),
+        rotation_angle=float(args.get("rotation_angle", 0)),
+    )
+
+
+def handle_draw_ellipse(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle draw_ellipse request.
+
+    Draws an ellipse in a sketch.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch (required)
+            - center_x: Center X coordinate in mm (default 0)
+            - center_y: Center Y coordinate in mm (default 0)
+            - major_radius: Major axis radius in mm (required)
+            - minor_radius: Minor axis radius in mm (required)
+            - rotation_angle: Rotation of major axis in degrees (default 0)
+
+    Returns:
+        Dict with curve ID and ellipse information
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "major_radius" not in args:
+        raise InvalidParameterError("major_radius", None, reason="major_radius is required")
+    if "minor_radius" not in args:
+        raise InvalidParameterError("minor_radius", None, reason="minor_radius is required")
+
+    return draw_ellipse(
+        sketch_id=args["sketch_id"],
+        center_x=float(args.get("center_x", 0)),
+        center_y=float(args.get("center_y", 0)),
+        major_radius=float(args["major_radius"]),
+        minor_radius=float(args["minor_radius"]),
+        rotation_angle=float(args.get("rotation_angle", 0)),
+    )
+
+
+def handle_draw_slot(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle draw_slot request.
+
+    Draws a slot shape (rounded rectangle/oblong) in a sketch.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch (required)
+            - center_x: Center X coordinate in mm (default 0)
+            - center_y: Center Y coordinate in mm (default 0)
+            - length: Slot length in mm (required)
+            - width: Slot width in mm (required)
+            - slot_type: "overall" or "center_to_center" (default "overall")
+            - rotation_angle: Rotation angle in degrees (default 0)
+
+    Returns:
+        Dict with curve IDs and slot information
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "length" not in args:
+        raise InvalidParameterError("length", None, reason="length is required")
+    if "width" not in args:
+        raise InvalidParameterError("width", None, reason="width is required")
+
+    return draw_slot(
+        sketch_id=args["sketch_id"],
+        center_x=float(args.get("center_x", 0)),
+        center_y=float(args.get("center_y", 0)),
+        length=float(args["length"]),
+        width=float(args["width"]),
+        slot_type=args.get("slot_type", "overall"),
+        rotation_angle=float(args.get("rotation_angle", 0)),
+    )
+
+
+def handle_draw_spline(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle draw_spline request.
+
+    Draws a spline (smooth curve) through control points in a sketch.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch (required)
+            - points: List of {x, y} point dicts in mm (required)
+            - is_closed: Whether to create a closed spline loop (default False)
+
+    Returns:
+        Dict with curve ID and spline information
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "points" not in args:
+        raise InvalidParameterError("points", None, reason="points is required")
+
+    points = args["points"]
+    if not isinstance(points, list):
+        raise InvalidParameterError("points", points, reason="points must be a list")
+
+    return draw_spline(
+        sketch_id=args["sketch_id"],
+        points=points,
+        is_closed=bool(args.get("is_closed", False)),
+    )
+
+
+def handle_draw_point(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle draw_point request.
+
+    Draws a point in a sketch.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch (required)
+            - x: X coordinate in mm (required)
+            - y: Y coordinate in mm (required)
+            - is_construction: Mark as construction geometry (default False)
+
+    Returns:
+        Dict with point ID and point information
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "x" not in args:
+        raise InvalidParameterError("x", None, reason="x coordinate is required")
+    if "y" not in args:
+        raise InvalidParameterError("y", None, reason="y coordinate is required")
+
+    return draw_point(
+        sketch_id=args["sketch_id"],
+        x=float(args["x"]),
+        y=float(args["y"]),
+        is_construction=bool(args.get("is_construction", False)),
     )
