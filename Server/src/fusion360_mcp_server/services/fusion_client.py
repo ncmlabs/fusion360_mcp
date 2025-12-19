@@ -10,12 +10,7 @@ import httpx
 
 from ..config import get_config, ServerConfig
 from ..logging import get_logger
-
-# Import shared exceptions
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))))
-from shared.exceptions import (
+from ..exceptions import (
     ConnectionError as FusionConnectionError,
     TimeoutError as FusionTimeoutError,
     FusionMCPError,

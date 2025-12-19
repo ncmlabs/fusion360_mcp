@@ -7,13 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 from fusion360_mcp_server.services.fusion_client import FusionClient
 from fusion360_mcp_server.config import ServerConfig
-
-
-# Import shared exceptions for testing
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from shared.exceptions import (
+from fusion360_mcp_server.exceptions import (
     ConnectionError as FusionConnectionError,
     TimeoutError as FusionTimeoutError,
     EntityNotFoundError,
