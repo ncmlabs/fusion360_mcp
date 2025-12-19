@@ -1839,12 +1839,17 @@ def add_sketch_text(
         texts = sketch.sketchTexts
         text_input = texts.createInput2(text, height_cm)
 
-        # Set position
+        # Set position using multi-line mode with a bounding box
+        # Create a second corner point for the text box (width based on text length estimate)
+        estimated_width = len(text) * height_cm * 0.6  # Rough estimate
+        corner_point2 = adsk.core.Point3D.create(x_cm + estimated_width, y_cm - height_cm * 1.5, 0)
+
         text_input.setAsMultiLine(
             corner_point,
-            adsk.core.TextHorizontalAlignment.LeftTextHorizontalAlignment,
-            adsk.core.TextVerticalAlignment.TopTextVerticalAlignment,
-            0.0  # No character spacing
+            corner_point2,
+            adsk.core.HorizontalAlignments.LeftHorizontalAlignment,
+            adsk.core.VerticalAlignments.TopVerticalAlignment,
+            0.0  # No rotation
         )
 
         # Set font if specified
