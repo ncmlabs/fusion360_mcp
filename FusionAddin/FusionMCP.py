@@ -68,6 +68,21 @@ from handlers.modification_handlers import (
     handle_edit_sketch,
 )
 
+# Import assembly handlers
+from handlers.assembly_handlers import (
+    handle_create_component,
+    handle_get_components,
+    handle_get_component_by_id,
+    handle_activate_component,
+    handle_get_component_bodies,
+    handle_get_occurrences,
+    handle_move_occurrence,
+    handle_create_joint,
+    handle_create_joint_between_occurrences,
+    handle_get_joints,
+    handle_get_joint_by_id,
+)
+
 
 # Global state
 _app: Optional[Any] = None
@@ -113,6 +128,7 @@ def run(context: Dict[str, Any]) -> None:
         _register_query_routes()
         _register_creation_routes()
         _register_modification_routes()
+        _register_assembly_routes()
 
         # Start HTTP server
         config = ServerConfig(host=HTTP_HOST, port=HTTP_PORT)
@@ -211,6 +227,23 @@ def _register_task_handlers() -> None:
     _event_manager.register_task_handler("delete_feature", handle_delete_feature)
     _event_manager.register_task_handler("edit_sketch", handle_edit_sketch)
 
+    # Phase 5: Assembly handlers - Components
+    _event_manager.register_task_handler("create_component", handle_create_component)
+    _event_manager.register_task_handler("get_components", handle_get_components)
+    _event_manager.register_task_handler("get_component_by_id", handle_get_component_by_id)
+    _event_manager.register_task_handler("activate_component", handle_activate_component)
+    _event_manager.register_task_handler("get_component_bodies", handle_get_component_bodies)
+
+    # Phase 5: Assembly handlers - Occurrences
+    _event_manager.register_task_handler("get_occurrences", handle_get_occurrences)
+    _event_manager.register_task_handler("move_occurrence", handle_move_occurrence)
+
+    # Phase 5: Assembly handlers - Joints
+    _event_manager.register_task_handler("create_joint", handle_create_joint)
+    _event_manager.register_task_handler("create_joint_between_occurrences", handle_create_joint_between_occurrences)
+    _event_manager.register_task_handler("get_joints", handle_get_joints)
+    _event_manager.register_task_handler("get_joint_by_id", handle_get_joint_by_id)
+
 
 def _register_query_routes() -> None:
     """Register HTTP routes for query endpoints."""
@@ -266,6 +299,29 @@ def _register_modification_routes() -> None:
 
     # Phase 3: Sketch edit routes
     FusionHTTPHandler.register_route("POST", "/modify/sketch", "edit_sketch")
+
+
+def _register_assembly_routes() -> None:
+    """Register HTTP routes for assembly endpoints."""
+    # Phase 5: Component routes
+    FusionHTTPHandler.register_route("POST", "/assembly/create_component", "create_component")
+    FusionHTTPHandler.register_route("GET", "/assembly/components", "get_components")
+    FusionHTTPHandler.register_route("POST", "/assembly/components", "get_components")
+    FusionHTTPHandler.register_route("POST", "/assembly/component", "get_component_by_id")
+    FusionHTTPHandler.register_route("POST", "/assembly/activate_component", "activate_component")
+    FusionHTTPHandler.register_route("POST", "/assembly/component_bodies", "get_component_bodies")
+
+    # Phase 5: Occurrence routes
+    FusionHTTPHandler.register_route("POST", "/assembly/occurrences", "get_occurrences")
+    FusionHTTPHandler.register_route("GET", "/assembly/occurrences", "get_occurrences")
+    FusionHTTPHandler.register_route("POST", "/assembly/move_occurrence", "move_occurrence")
+
+    # Phase 5: Joint routes
+    FusionHTTPHandler.register_route("POST", "/assembly/create_joint", "create_joint")
+    FusionHTTPHandler.register_route("POST", "/assembly/create_joint_occurrences", "create_joint_between_occurrences")
+    FusionHTTPHandler.register_route("GET", "/assembly/joints", "get_joints")
+    FusionHTTPHandler.register_route("POST", "/assembly/joints", "get_joints")
+    FusionHTTPHandler.register_route("POST", "/assembly/joint", "get_joint_by_id")
 
 
 def _show_message(message: str) -> None:

@@ -5,7 +5,7 @@ from mcp.server.fastmcp import FastMCP
 
 from .config import get_config
 from .logging import setup_logging, get_logger
-from .tools import register_query_tools, register_creation_tools, register_modification_tools
+from .tools import register_query_tools, register_creation_tools, register_modification_tools, register_assembly_tools
 
 
 # Create FastMCP server instance
@@ -35,6 +35,15 @@ MODIFICATION WORKFLOW:
 4. Update design parameters with update_parameter() for dynamic changes
 5. Delete bodies with delete_body() or features with delete_feature()
 6. Edit sketch curves with edit_sketch() to modify geometry
+
+ASSEMBLY WORKFLOW:
+1. Create components with create_component() to organize related geometry
+2. Activate a component with activate_component() before adding geometry to it
+3. Query components with get_components() and get_component_by_id()
+4. Position component instances with move_occurrence()
+5. Connect components with create_joint() or create_joint_between_occurrences()
+6. Query joints with get_joints() and get_joint_by_id()
+7. Joint types: rigid, revolute, slider, cylindrical, pin_slot, planar, ball
 
 IMPORTANT:
 - All dimensions are in millimeters (mm)
@@ -92,6 +101,9 @@ def main() -> None:
 
     register_modification_tools(mcp)
     logger.info("Modification tools registered")
+
+    register_assembly_tools(mcp)
+    logger.info("Assembly tools registered")
 
     # Determine transport
     transport = args.transport or config.server_transport
