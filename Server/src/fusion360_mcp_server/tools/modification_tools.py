@@ -9,7 +9,7 @@ IMPORTANT: Move and rotate operations use defineAsTranslate/defineAsRotate
 which preserve parametric relationships in the design.
 """
 
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from mcp.server.fastmcp import FastMCP
 
 from ..services.fusion_client import FusionClient

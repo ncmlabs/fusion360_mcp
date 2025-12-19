@@ -5,26 +5,12 @@ HTTP server, with retry logic and response parsing.
 """
 
 import asyncio
-from typing import Optional, Dict, Any, TypeVar, Type, List
+from typing import Optional, Dict, Any, List
 import httpx
-from pydantic import BaseModel
 
 from ..config import get_config, ServerConfig
-from ..models import (
-    DesignInfo,
-    Body,
-    BodySummary,
-    Sketch,
-    SketchSummary,
-    Parameter,
-)
 from ..logging import get_logger
-
-# Import shared exceptions
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))))
-from shared.exceptions import (
+from ..exceptions import (
     ConnectionError as FusionConnectionError,
     TimeoutError as FusionTimeoutError,
     FusionMCPError,
@@ -34,7 +20,6 @@ from shared.exceptions import (
 )
 
 
-T = TypeVar('T', bound=BaseModel)
 logger = get_logger(__name__)
 
 
@@ -364,17 +349,35 @@ class FusionClient:
 
     # --- Health Check ---
 
-    async def health_check(self) -> bool:
+    async def health_check(self) -> Dict[str, Any]:
         """Check if add-in is responsive.
 
         Returns:
-            True if add-in is healthy, False otherwise
+            Dict with status, message, and version
         """
         try:
             result = await self._request("GET", "/health")
-            return result.get("status") == "ok"
-        except Exception:
-            return False
+            return {
+                "healthy": result.get("status") == "healthy",
+                "status": result.get("status", "unknown"),
+                "message": result.get("message", ""),
+                "version": result.get("version", "unknown"),
+            }
+        except Exception as e:
+            return {
+                "healthy": False,
+                "status": "unreachable",
+                "message": str(e),
+                "version": "unknown",
+            }
+
+    async def get_version(self) -> Dict[str, Any]:
+        """Get version information from add-in.
+
+        Returns:
+            Dict with addin_name, addin_version, fusion_version, api_version
+        """
+        return await self._request("GET", "/version")
 
     # --- Creation Methods ---
 

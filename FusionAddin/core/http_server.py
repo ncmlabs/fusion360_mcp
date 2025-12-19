@@ -285,6 +285,11 @@ class FusionHTTPServer:
         return f"http://{self.config.host}:{self.config.port}"
 
 
+# Add-in version info
+ADDIN_VERSION = "0.1.0"
+ADDIN_NAME = "FusionMCP"
+
+
 # Default health check handler
 def health_check_handler(args: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
     """Health check endpoint handler.
@@ -296,10 +301,29 @@ def health_check_handler(args: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
         "success": True,
         "message": "Fusion 360 MCP Add-in is running",
         "status": "healthy",
+        "version": ADDIN_VERSION,
+    }
+
+
+def version_handler(args: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
+    """Version endpoint handler.
+
+    Returns:
+        Tuple of (status_code, response_dict)
+    """
+    import adsk.core
+    app = adsk.core.Application.get()
+    return HTTPStatus.OK, {
+        "success": True,
+        "addin_name": ADDIN_NAME,
+        "addin_version": ADDIN_VERSION,
+        "fusion_version": app.version if app else "unknown",
+        "api_version": "1.0",
     }
 
 
 def setup_default_routes() -> None:
     """Setup default routes for the HTTP server."""
     FusionHTTPHandler.register_custom_handler("GET", "/health", health_check_handler)
+    FusionHTTPHandler.register_custom_handler("GET", "/version", version_handler)
     FusionHTTPHandler.register_custom_handler("GET", "/test", health_check_handler)
