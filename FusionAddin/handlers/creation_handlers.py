@@ -18,6 +18,12 @@ from operations.sketch_ops import (
     draw_slot,
     draw_spline,
     draw_point,
+    # Phase 7b: Sketch Patterns & Operations
+    sketch_mirror,
+    sketch_circular_pattern,
+    sketch_rectangular_pattern,
+    project_geometry,
+    add_sketch_text,
 )
 from operations.feature_ops import (
     extrude,
@@ -642,4 +648,188 @@ def handle_draw_point(args: Dict[str, Any]) -> Dict[str, Any]:
         x=float(args["x"]),
         y=float(args["y"]),
         is_construction=bool(args.get("is_construction", False)),
+    )
+
+
+# --- Phase 7b: Sketch Patterns & Operations Handlers ---
+
+def handle_sketch_mirror(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle sketch_mirror request.
+
+    Mirrors sketch entities across a line.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch (required)
+            - curve_ids: List of curve IDs to mirror (required)
+            - mirror_line_id: ID of the line to mirror across (required)
+
+    Returns:
+        Dict with mirrored curve IDs and information
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "curve_ids" not in args:
+        raise InvalidParameterError("curve_ids", None, reason="curve_ids is required")
+    if "mirror_line_id" not in args:
+        raise InvalidParameterError("mirror_line_id", None, reason="mirror_line_id is required")
+
+    curve_ids = args["curve_ids"]
+    if isinstance(curve_ids, str):
+        curve_ids = [curve_ids]
+
+    return sketch_mirror(
+        sketch_id=args["sketch_id"],
+        curve_ids=curve_ids,
+        mirror_line_id=args["mirror_line_id"],
+    )
+
+
+def handle_sketch_circular_pattern(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle sketch_circular_pattern request.
+
+    Creates a circular pattern of sketch entities.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch (required)
+            - curve_ids: List of curve IDs to pattern (required)
+            - center_x: Pattern center X in mm (default 0)
+            - center_y: Pattern center Y in mm (default 0)
+            - count: Number of instances including original (required)
+            - total_angle: Total angle span in degrees (default 360)
+
+    Returns:
+        Dict with pattern information and new curve IDs
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "curve_ids" not in args:
+        raise InvalidParameterError("curve_ids", None, reason="curve_ids is required")
+    if "count" not in args:
+        raise InvalidParameterError("count", None, reason="count is required")
+
+    curve_ids = args["curve_ids"]
+    if isinstance(curve_ids, str):
+        curve_ids = [curve_ids]
+
+    return sketch_circular_pattern(
+        sketch_id=args["sketch_id"],
+        curve_ids=curve_ids,
+        center_x=float(args.get("center_x", 0)),
+        center_y=float(args.get("center_y", 0)),
+        count=int(args["count"]),
+        total_angle=float(args.get("total_angle", 360)),
+    )
+
+
+def handle_sketch_rectangular_pattern(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle sketch_rectangular_pattern request.
+
+    Creates a rectangular pattern of sketch entities.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch (required)
+            - curve_ids: List of curve IDs to pattern (required)
+            - x_count: Number of columns (required)
+            - y_count: Number of rows (required)
+            - x_spacing: Column spacing in mm (required)
+            - y_spacing: Row spacing in mm (required)
+
+    Returns:
+        Dict with pattern information and new curve IDs
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "curve_ids" not in args:
+        raise InvalidParameterError("curve_ids", None, reason="curve_ids is required")
+    if "x_count" not in args:
+        raise InvalidParameterError("x_count", None, reason="x_count is required")
+    if "y_count" not in args:
+        raise InvalidParameterError("y_count", None, reason="y_count is required")
+    if "x_spacing" not in args:
+        raise InvalidParameterError("x_spacing", None, reason="x_spacing is required")
+    if "y_spacing" not in args:
+        raise InvalidParameterError("y_spacing", None, reason="y_spacing is required")
+
+    curve_ids = args["curve_ids"]
+    if isinstance(curve_ids, str):
+        curve_ids = [curve_ids]
+
+    return sketch_rectangular_pattern(
+        sketch_id=args["sketch_id"],
+        curve_ids=curve_ids,
+        x_count=int(args["x_count"]),
+        y_count=int(args["y_count"]),
+        x_spacing=float(args["x_spacing"]),
+        y_spacing=float(args["y_spacing"]),
+    )
+
+
+def handle_project_geometry(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle project_geometry request.
+
+    Projects edges or faces from 3D bodies onto a sketch.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the target sketch (required)
+            - entity_ids: List of entity IDs to project (required)
+            - project_type: "standard" or "cut_edges" (default "standard")
+
+    Returns:
+        Dict with projected curve IDs and information
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "entity_ids" not in args:
+        raise InvalidParameterError("entity_ids", None, reason="entity_ids is required")
+
+    entity_ids = args["entity_ids"]
+    if isinstance(entity_ids, str):
+        entity_ids = [entity_ids]
+
+    return project_geometry(
+        sketch_id=args["sketch_id"],
+        entity_ids=entity_ids,
+        project_type=args.get("project_type", "standard"),
+    )
+
+
+def handle_add_sketch_text(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle add_sketch_text request.
+
+    Adds text to a sketch for engraving or embossing.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the target sketch (required)
+            - text: Text content (required)
+            - x: Text position X in mm (default 0)
+            - y: Text position Y in mm (default 0)
+            - height: Text height in mm (required)
+            - font_name: Font name (optional)
+            - is_bold: Bold text (default False)
+            - is_italic: Italic text (default False)
+
+    Returns:
+        Dict with text information and profiles
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "text" not in args:
+        raise InvalidParameterError("text", None, reason="text is required")
+    if "height" not in args:
+        raise InvalidParameterError("height", None, reason="height is required")
+
+    return add_sketch_text(
+        sketch_id=args["sketch_id"],
+        text=args["text"],
+        x=float(args.get("x", 0)),
+        y=float(args.get("y", 0)),
+        height=float(args["height"]),
+        font_name=args.get("font_name"),
+        is_bold=bool(args.get("is_bold", False)),
+        is_italic=bool(args.get("is_italic", False)),
     )

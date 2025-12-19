@@ -1135,3 +1135,769 @@ def draw_point(
             f"Failed to draw point: {str(e)}",
             fusion_error=str(e)
         )
+
+
+# --- Phase 7b: Sketch Patterns & Operations ---
+
+
+def _get_curve(sketch: Any, curve_id: str, registry: Any) -> Any:
+    """Get a sketch curve by ID.
+
+    Args:
+        sketch: Fusion Sketch object
+        curve_id: Curve ID
+        registry: Entity registry
+
+    Returns:
+        Fusion SketchCurve object
+
+    Raises:
+        EntityNotFoundError: If curve not found
+    """
+    curve = registry.get_sub_entity(curve_id)
+
+    if not curve:
+        # Try to find by index from the curve_id
+        # curve_id format: "sketch_id_curve_N"
+        parts = curve_id.split("_curve_")
+        if len(parts) == 2:
+            try:
+                curve_index = int(parts[1])
+                if curve_index < sketch.sketchCurves.count:
+                    curve = sketch.sketchCurves.item(curve_index)
+            except ValueError:
+                pass
+
+    if not curve:
+        raise EntityNotFoundError("Curve", curve_id, [])
+
+    return curve
+
+
+def sketch_mirror(
+    sketch_id: str,
+    curve_ids: List[str],
+    mirror_line_id: str,
+) -> Dict[str, Any]:
+    """Mirror sketch entities across a line.
+
+    Creates mirrored copies of the specified curves, maintaining
+    symmetry constraints with the mirror line.
+
+    Args:
+        sketch_id: ID of the sketch
+        curve_ids: List of curve IDs to mirror
+        mirror_line_id: ID of the line to mirror across
+
+    Returns:
+        Dict with mirrored curve IDs and information
+
+    Raises:
+        EntityNotFoundError: If sketch, curves, or mirror line not found
+        FeatureError: If mirror operation fails
+    """
+    if not curve_ids:
+        raise InvalidParameterError(
+            "curve_ids", "empty list",
+            reason="At least one curve ID is required"
+        )
+
+    registry = get_registry()
+    sketch = _get_sketch(sketch_id)
+
+    try:
+        # Get mirror line
+        mirror_line = _get_curve(sketch, mirror_line_id, registry)
+
+        if not hasattr(mirror_line, "startSketchPoint"):
+            raise InvalidParameterError(
+                "mirror_line_id", mirror_line_id,
+                reason="Mirror line must be a SketchLine"
+            )
+
+        # Collect curves to mirror
+        curves_to_mirror = adsk.core.ObjectCollection.create()
+        for curve_id in curve_ids:
+            curve = _get_curve(sketch, curve_id, registry)
+            curves_to_mirror.add(curve)
+
+        # Get mirror line geometry
+        line_start = mirror_line.startSketchPoint.geometry
+        line_end = mirror_line.endSketchPoint.geometry
+
+        # Create mirrored copies manually using transformation
+        # Calculate mirror transformation matrix
+        # Mirror across line from line_start to line_end
+        dx = line_end.x - line_start.x
+        dy = line_end.y - line_start.y
+        line_length = math.sqrt(dx * dx + dy * dy)
+
+        if line_length < 0.0001:
+            raise FeatureError(
+                "mirror",
+                "Mirror line is too short",
+            )
+
+        # Normalize direction vector
+        nx = dx / line_length
+        ny = dy / line_length
+
+        # Mirror transformation: P' = 2 * (P . n) * n - P
+        # For a line through origin with unit normal (nx, ny)
+        # Reflection matrix: [[nx*nx - ny*ny, 2*nx*ny], [2*nx*ny, ny*ny - nx*nx]]
+
+        mirrored_curve_ids = []
+        base_index = sketch.sketchCurves.count
+
+        for i, curve_id in enumerate(curve_ids):
+            curve = _get_curve(sketch, curve_id, registry)
+
+            # Mirror based on curve type
+            if hasattr(curve, "startSketchPoint") and hasattr(curve, "endSketchPoint"):
+                # Line or arc
+                start_pt = curve.startSketchPoint.geometry
+                end_pt = curve.endSketchPoint.geometry
+
+                # Transform points across mirror line
+                new_start = _mirror_point(start_pt, line_start, nx, ny)
+                new_end = _mirror_point(end_pt, line_start, nx, ny)
+
+                if hasattr(curve, "centerSketchPoint"):
+                    # Arc
+                    center_pt = curve.centerSketchPoint.geometry
+                    new_center = _mirror_point(center_pt, line_start, nx, ny)
+
+                    arcs = sketch.sketchCurves.sketchArcs
+                    new_arc = arcs.addByCenterStartEnd(new_center, new_end, new_start)
+
+                    if new_arc:
+                        mirrored_id = registry.register_sub_entity(
+                            sketch_id, "curve", base_index + len(mirrored_curve_ids), new_arc
+                        )
+                        mirrored_curve_ids.append(mirrored_id)
+                else:
+                    # Line
+                    lines = sketch.sketchCurves.sketchLines
+                    new_line = lines.addByTwoPoints(new_start, new_end)
+
+                    if new_line:
+                        mirrored_id = registry.register_sub_entity(
+                            sketch_id, "curve", base_index + len(mirrored_curve_ids), new_line
+                        )
+                        mirrored_curve_ids.append(mirrored_id)
+
+            elif hasattr(curve, "centerSketchPoint") and hasattr(curve, "radius"):
+                # Circle
+                center_pt = curve.centerSketchPoint.geometry
+                radius = curve.radius
+                new_center = _mirror_point(center_pt, line_start, nx, ny)
+
+                circles = sketch.sketchCurves.sketchCircles
+                new_circle = circles.addByCenterRadius(new_center, radius)
+
+                if new_circle:
+                    mirrored_id = registry.register_sub_entity(
+                        sketch_id, "curve", base_index + len(mirrored_curve_ids), new_circle
+                    )
+                    mirrored_curve_ids.append(mirrored_id)
+
+        return {
+            "success": True,
+            "mirrored_curves": mirrored_curve_ids,
+            "original_curves": curve_ids,
+            "mirror_line_id": mirror_line_id,
+            "sketch_id": sketch_id,
+            "profiles_count": sketch.profiles.count,
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError(
+            "mirror",
+            f"Failed to mirror curves: {str(e)}",
+            fusion_error=str(e)
+        )
+
+
+def _mirror_point(
+    point: Any,
+    line_point: Any,
+    nx: float,
+    ny: float,
+) -> Any:
+    """Mirror a point across a line.
+
+    Args:
+        point: Point to mirror
+        line_point: A point on the mirror line
+        nx: Normalized X direction of mirror line
+        ny: Normalized Y direction of mirror line
+
+    Returns:
+        Mirrored Point3D
+    """
+    # Translate point relative to line
+    px = point.x - line_point.x
+    py = point.y - line_point.y
+
+    # Reflect across line through origin
+    # P' = 2 * (P . n) * n - P
+    # Where n is the line direction (nx, ny)
+    dot = px * nx + py * ny
+    rx = 2 * dot * nx - px
+    ry = 2 * dot * ny - py
+
+    # Translate back
+    return adsk.core.Point3D.create(
+        rx + line_point.x,
+        ry + line_point.y,
+        point.z
+    )
+
+
+def sketch_circular_pattern(
+    sketch_id: str,
+    curve_ids: List[str],
+    center_x: float,
+    center_y: float,
+    count: int,
+    total_angle: float = 360.0,
+) -> Dict[str, Any]:
+    """Create a circular pattern of sketch entities.
+
+    Copies the specified curves in a circular array around a center point.
+
+    Args:
+        sketch_id: ID of the sketch
+        curve_ids: List of curve IDs to pattern
+        center_x: Pattern center X coordinate in mm
+        center_y: Pattern center Y coordinate in mm
+        count: Number of instances (including original)
+        total_angle: Total angle span in degrees (default 360)
+
+    Returns:
+        Dict with pattern information and new curve IDs
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If sketch or curves not found
+        FeatureError: If pattern operation fails
+    """
+    if not curve_ids:
+        raise InvalidParameterError(
+            "curve_ids", "empty list",
+            reason="At least one curve ID is required"
+        )
+
+    if count < 2:
+        raise InvalidParameterError(
+            "count", count,
+            reason="Count must be at least 2"
+        )
+
+    if count > 360:
+        raise InvalidParameterError(
+            "count", count,
+            reason="Count cannot exceed 360"
+        )
+
+    registry = get_registry()
+    sketch = _get_sketch(sketch_id)
+
+    try:
+        # Convert mm to cm
+        cx_cm = center_x / 10.0
+        cy_cm = center_y / 10.0
+
+        # Calculate angle step
+        angle_step = math.radians(total_angle) / count
+
+        all_pattern_curve_ids = []
+        base_index = sketch.sketchCurves.count
+
+        # Create copies for each instance (skip first - it's the original)
+        for instance in range(1, count):
+            angle = instance * angle_step
+
+            cos_a = math.cos(angle)
+            sin_a = math.sin(angle)
+
+            for curve_id in curve_ids:
+                curve = _get_curve(sketch, curve_id, registry)
+
+                # Pattern based on curve type
+                if hasattr(curve, "startSketchPoint") and hasattr(curve, "endSketchPoint"):
+                    # Line or arc
+                    start_pt = curve.startSketchPoint.geometry
+                    end_pt = curve.endSketchPoint.geometry
+
+                    new_start = _rotate_point(start_pt, cx_cm, cy_cm, cos_a, sin_a)
+                    new_end = _rotate_point(end_pt, cx_cm, cy_cm, cos_a, sin_a)
+
+                    if hasattr(curve, "centerSketchPoint"):
+                        # Arc
+                        center_pt = curve.centerSketchPoint.geometry
+                        new_center = _rotate_point(center_pt, cx_cm, cy_cm, cos_a, sin_a)
+
+                        arcs = sketch.sketchCurves.sketchArcs
+                        new_arc = arcs.addByCenterStartEnd(new_center, new_start, new_end)
+
+                        if new_arc:
+                            new_id = registry.register_sub_entity(
+                                sketch_id, "curve", base_index + len(all_pattern_curve_ids), new_arc
+                            )
+                            all_pattern_curve_ids.append(new_id)
+                    else:
+                        # Line
+                        lines = sketch.sketchCurves.sketchLines
+                        new_line = lines.addByTwoPoints(new_start, new_end)
+
+                        if new_line:
+                            new_id = registry.register_sub_entity(
+                                sketch_id, "curve", base_index + len(all_pattern_curve_ids), new_line
+                            )
+                            all_pattern_curve_ids.append(new_id)
+
+                elif hasattr(curve, "centerSketchPoint") and hasattr(curve, "radius"):
+                    # Circle
+                    center_pt = curve.centerSketchPoint.geometry
+                    radius = curve.radius
+                    new_center = _rotate_point(center_pt, cx_cm, cy_cm, cos_a, sin_a)
+
+                    circles = sketch.sketchCurves.sketchCircles
+                    new_circle = circles.addByCenterRadius(new_center, radius)
+
+                    if new_circle:
+                        new_id = registry.register_sub_entity(
+                            sketch_id, "curve", base_index + len(all_pattern_curve_ids), new_circle
+                        )
+                        all_pattern_curve_ids.append(new_id)
+
+        return {
+            "success": True,
+            "pattern_curves": all_pattern_curve_ids,
+            "original_curves": curve_ids,
+            "pattern": {
+                "type": "circular",
+                "center": {"x": center_x, "y": center_y, "z": 0},
+                "count": count,
+                "total_angle": total_angle,
+                "angle_step": total_angle / count,
+            },
+            "sketch_id": sketch_id,
+            "profiles_count": sketch.profiles.count,
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError(
+            "circular_pattern",
+            f"Failed to create circular pattern: {str(e)}",
+            fusion_error=str(e)
+        )
+
+
+def _rotate_point(
+    point: Any,
+    cx: float,
+    cy: float,
+    cos_a: float,
+    sin_a: float,
+) -> Any:
+    """Rotate a point around a center.
+
+    Args:
+        point: Point to rotate
+        cx: Center X in cm
+        cy: Center Y in cm
+        cos_a: Cosine of rotation angle
+        sin_a: Sine of rotation angle
+
+    Returns:
+        Rotated Point3D
+    """
+    # Translate to origin
+    px = point.x - cx
+    py = point.y - cy
+
+    # Rotate
+    rx = px * cos_a - py * sin_a
+    ry = px * sin_a + py * cos_a
+
+    # Translate back
+    return adsk.core.Point3D.create(rx + cx, ry + cy, point.z)
+
+
+def sketch_rectangular_pattern(
+    sketch_id: str,
+    curve_ids: List[str],
+    x_count: int,
+    y_count: int,
+    x_spacing: float,
+    y_spacing: float,
+) -> Dict[str, Any]:
+    """Create a rectangular pattern of sketch entities.
+
+    Copies the specified curves in a rectangular grid array.
+
+    Args:
+        sketch_id: ID of the sketch
+        curve_ids: List of curve IDs to pattern
+        x_count: Number of columns
+        y_count: Number of rows
+        x_spacing: Column spacing in mm
+        y_spacing: Row spacing in mm
+
+    Returns:
+        Dict with pattern information and new curve IDs
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If sketch or curves not found
+        FeatureError: If pattern operation fails
+    """
+    if not curve_ids:
+        raise InvalidParameterError(
+            "curve_ids", "empty list",
+            reason="At least one curve ID is required"
+        )
+
+    if x_count < 1 or y_count < 1:
+        raise InvalidParameterError(
+            "count", f"x={x_count}, y={y_count}",
+            reason="Both x_count and y_count must be at least 1"
+        )
+
+    if x_count * y_count > 1000:
+        raise InvalidParameterError(
+            "count", x_count * y_count,
+            reason="Total pattern count cannot exceed 1000"
+        )
+
+    registry = get_registry()
+    sketch = _get_sketch(sketch_id)
+
+    try:
+        # Convert mm to cm
+        x_spacing_cm = x_spacing / 10.0
+        y_spacing_cm = y_spacing / 10.0
+
+        all_pattern_curve_ids = []
+        base_index = sketch.sketchCurves.count
+
+        # Create copies for each grid position (skip 0,0 - it's the original)
+        for row in range(y_count):
+            for col in range(x_count):
+                if row == 0 and col == 0:
+                    continue  # Skip original position
+
+                dx = col * x_spacing_cm
+                dy = row * y_spacing_cm
+
+                for curve_id in curve_ids:
+                    curve = _get_curve(sketch, curve_id, registry)
+
+                    # Pattern based on curve type
+                    if hasattr(curve, "startSketchPoint") and hasattr(curve, "endSketchPoint"):
+                        # Line or arc
+                        start_pt = curve.startSketchPoint.geometry
+                        end_pt = curve.endSketchPoint.geometry
+
+                        new_start = _translate_point(start_pt, dx, dy)
+                        new_end = _translate_point(end_pt, dx, dy)
+
+                        if hasattr(curve, "centerSketchPoint"):
+                            # Arc
+                            center_pt = curve.centerSketchPoint.geometry
+                            new_center = _translate_point(center_pt, dx, dy)
+
+                            arcs = sketch.sketchCurves.sketchArcs
+                            new_arc = arcs.addByCenterStartEnd(new_center, new_start, new_end)
+
+                            if new_arc:
+                                new_id = registry.register_sub_entity(
+                                    sketch_id, "curve", base_index + len(all_pattern_curve_ids), new_arc
+                                )
+                                all_pattern_curve_ids.append(new_id)
+                        else:
+                            # Line
+                            lines = sketch.sketchCurves.sketchLines
+                            new_line = lines.addByTwoPoints(new_start, new_end)
+
+                            if new_line:
+                                new_id = registry.register_sub_entity(
+                                    sketch_id, "curve", base_index + len(all_pattern_curve_ids), new_line
+                                )
+                                all_pattern_curve_ids.append(new_id)
+
+                    elif hasattr(curve, "centerSketchPoint") and hasattr(curve, "radius"):
+                        # Circle
+                        center_pt = curve.centerSketchPoint.geometry
+                        radius = curve.radius
+                        new_center = _translate_point(center_pt, dx, dy)
+
+                        circles = sketch.sketchCurves.sketchCircles
+                        new_circle = circles.addByCenterRadius(new_center, radius)
+
+                        if new_circle:
+                            new_id = registry.register_sub_entity(
+                                sketch_id, "curve", base_index + len(all_pattern_curve_ids), new_circle
+                            )
+                            all_pattern_curve_ids.append(new_id)
+
+        return {
+            "success": True,
+            "pattern_curves": all_pattern_curve_ids,
+            "original_curves": curve_ids,
+            "pattern": {
+                "type": "rectangular",
+                "x_count": x_count,
+                "y_count": y_count,
+                "x_spacing": x_spacing,
+                "y_spacing": y_spacing,
+                "total_instances": x_count * y_count,
+            },
+            "sketch_id": sketch_id,
+            "profiles_count": sketch.profiles.count,
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError(
+            "rectangular_pattern",
+            f"Failed to create rectangular pattern: {str(e)}",
+            fusion_error=str(e)
+        )
+
+
+def _translate_point(point: Any, dx: float, dy: float) -> Any:
+    """Translate a point by dx, dy.
+
+    Args:
+        point: Point to translate
+        dx: X translation in cm
+        dy: Y translation in cm
+
+    Returns:
+        Translated Point3D
+    """
+    return adsk.core.Point3D.create(point.x + dx, point.y + dy, point.z)
+
+
+def project_geometry(
+    sketch_id: str,
+    entity_ids: List[str],
+    project_type: str = "standard",
+) -> Dict[str, Any]:
+    """Project edges or faces from 3D bodies onto a sketch.
+
+    Projects existing 3D geometry (edges, faces) onto the sketch plane,
+    creating reference curves that can be used for further sketch operations.
+
+    Args:
+        sketch_id: ID of the target sketch
+        entity_ids: List of entity IDs to project (edges, faces, or bodies)
+        project_type: Projection type:
+            - "standard": Regular projection (default)
+            - "cut_edges": Project only edges that intersect sketch plane
+
+    Returns:
+        Dict with projected curve IDs and information
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If sketch or entities not found
+        FeatureError: If projection fails
+    """
+    if not entity_ids:
+        raise InvalidParameterError(
+            "entity_ids", "empty list",
+            reason="At least one entity ID is required"
+        )
+
+    if project_type not in ["standard", "cut_edges"]:
+        raise InvalidParameterError(
+            "project_type", project_type,
+            valid_values=["standard", "cut_edges"]
+        )
+
+    registry = get_registry()
+    sketch = _get_sketch(sketch_id)
+
+    try:
+        projected_curve_ids = []
+        base_index = sketch.sketchCurves.count
+
+        for entity_id in entity_ids:
+            # Get the entity
+            entity = registry.get_sub_entity(entity_id)
+
+            if not entity:
+                # Try to find body
+                entity = registry.get_body(entity_id)
+
+            if not entity:
+                raise EntityNotFoundError("Entity", entity_id, [])
+
+            # Project based on type
+            if project_type == "cut_edges":
+                # Use projectCutEdges for bodies/faces that intersect sketch plane
+                curves = sketch.projectCutEdges(entity)
+            else:
+                # Standard projection
+                curves = sketch.project(entity)
+
+            if curves:
+                # Register projected curves
+                for j in range(curves.count):
+                    curve = curves.item(j)
+                    curve_id = registry.register_sub_entity(
+                        sketch_id, "curve", base_index + len(projected_curve_ids), curve
+                    )
+                    projected_curve_ids.append(curve_id)
+
+        return {
+            "success": True,
+            "projected_curves": projected_curve_ids,
+            "source_entities": entity_ids,
+            "project_type": project_type,
+            "sketch_id": sketch_id,
+            "curves_created": len(projected_curve_ids),
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError(
+            "project_geometry",
+            f"Failed to project geometry: {str(e)}",
+            fusion_error=str(e)
+        )
+
+
+def add_sketch_text(
+    sketch_id: str,
+    text: str,
+    x: float,
+    y: float,
+    height: float,
+    font_name: Optional[str] = None,
+    is_bold: bool = False,
+    is_italic: bool = False,
+) -> Dict[str, Any]:
+    """Add text to a sketch for engraving or embossing.
+
+    Creates sketch text that generates profiles suitable for extrusion,
+    enabling engraved or embossed text on parts.
+
+    Args:
+        sketch_id: ID of the target sketch
+        text: Text content to add
+        x: Text position X coordinate in mm
+        y: Text position Y coordinate in mm
+        height: Text height in mm
+        font_name: Optional font name (uses system default if not specified)
+        is_bold: Make text bold (default False)
+        is_italic: Make text italic (default False)
+
+    Returns:
+        Dict with text curve IDs and information
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If sketch not found
+        FeatureError: If text creation fails
+    """
+    if not text or not text.strip():
+        raise InvalidParameterError(
+            "text", text,
+            reason="Text content cannot be empty"
+        )
+
+    if height <= 0:
+        raise InvalidParameterError(
+            "height", height,
+            reason="Text height must be positive"
+        )
+
+    registry = get_registry()
+    sketch = _get_sketch(sketch_id)
+
+    try:
+        # Convert mm to cm
+        x_cm = x / 10.0
+        y_cm = y / 10.0
+        height_cm = height / 10.0
+
+        # Create corner point
+        corner_point = adsk.core.Point3D.create(x_cm, y_cm, 0)
+
+        # Create text input
+        texts = sketch.sketchTexts
+        text_input = texts.createInput2(text, height_cm)
+
+        # Set position using multi-line mode with a bounding box
+        # Create a second corner point for the text box (width based on text length estimate)
+        estimated_width = len(text) * height_cm * 0.6  # Rough estimate
+        corner_point2 = adsk.core.Point3D.create(x_cm + estimated_width, y_cm - height_cm * 1.5, 0)
+
+        text_input.setAsMultiLine(
+            corner_point,
+            corner_point2,
+            adsk.core.HorizontalAlignments.LeftHorizontalAlignment,
+            adsk.core.VerticalAlignments.TopVerticalAlignment,
+            0.0  # No rotation
+        )
+
+        # Set font if specified
+        if font_name:
+            text_input.fontName = font_name
+
+        # Set style
+        text_input.isBold = is_bold
+        text_input.isItalic = is_italic
+
+        # Add text to sketch
+        sketch_text = texts.add(text_input)
+
+        if not sketch_text:
+            raise FeatureError("text", "Failed to create sketch text")
+
+        # Get curves created by text
+        text_curve_ids = []
+        curves_before = sketch.sketchCurves.count
+        # Text creates curves, register them
+        # Note: curves are created as part of the text entity
+        for i in range(curves_before, sketch.sketchCurves.count):
+            curve = sketch.sketchCurves.item(i)
+            curve_id = registry.register_sub_entity(
+                sketch_id, "curve", i, curve
+            )
+            text_curve_ids.append(curve_id)
+
+        return {
+            "success": True,
+            "text": {
+                "content": text,
+                "position": {"x": x, "y": y, "z": 0},
+                "height": height,
+                "font_name": font_name or "Default",
+                "is_bold": is_bold,
+                "is_italic": is_italic,
+            },
+            "curves": text_curve_ids,
+            "sketch_id": sketch_id,
+            "profiles_count": sketch.profiles.count,
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError(
+            "text",
+            f"Failed to add sketch text: {str(e)}",
+            fusion_error=str(e)
+        )
