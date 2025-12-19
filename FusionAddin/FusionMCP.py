@@ -38,6 +38,25 @@ from handlers.query_handlers import (
     handle_get_timeline,
 )
 
+# Import creation handlers
+from handlers.creation_handlers import (
+    # Body creation
+    handle_create_box,
+    handle_create_cylinder,
+    # Sketch creation
+    handle_create_sketch,
+    handle_draw_line,
+    handle_draw_circle,
+    handle_draw_rectangle,
+    handle_draw_arc,
+    # Feature creation
+    handle_extrude,
+    handle_revolve,
+    handle_fillet,
+    handle_chamfer,
+    handle_create_hole,
+)
+
 
 # Global state
 _app: Optional[Any] = None
@@ -81,6 +100,7 @@ def run(context: Dict[str, Any]) -> None:
         # Setup HTTP routes
         setup_default_routes()
         _register_query_routes()
+        _register_creation_routes()
 
         # Start HTTP server
         config = ServerConfig(host=HTTP_HOST, port=HTTP_PORT)
@@ -152,6 +172,24 @@ def _register_task_handlers() -> None:
     _event_manager.register_task_handler("get_parameters", handle_get_parameters)
     _event_manager.register_task_handler("get_timeline", handle_get_timeline)
 
+    # Phase 2: Creation handlers - Bodies
+    _event_manager.register_task_handler("create_box", handle_create_box)
+    _event_manager.register_task_handler("create_cylinder", handle_create_cylinder)
+
+    # Phase 2: Creation handlers - Sketches
+    _event_manager.register_task_handler("create_sketch", handle_create_sketch)
+    _event_manager.register_task_handler("draw_line", handle_draw_line)
+    _event_manager.register_task_handler("draw_circle", handle_draw_circle)
+    _event_manager.register_task_handler("draw_rectangle", handle_draw_rectangle)
+    _event_manager.register_task_handler("draw_arc", handle_draw_arc)
+
+    # Phase 2: Creation handlers - Features
+    _event_manager.register_task_handler("extrude", handle_extrude)
+    _event_manager.register_task_handler("revolve", handle_revolve)
+    _event_manager.register_task_handler("fillet", handle_fillet)
+    _event_manager.register_task_handler("chamfer", handle_chamfer)
+    _event_manager.register_task_handler("create_hole", handle_create_hole)
+
 
 def _register_query_routes() -> None:
     """Register HTTP routes for query endpoints."""
@@ -168,6 +206,27 @@ def _register_query_routes() -> None:
     FusionHTTPHandler.register_route("GET", "/query/parameters", "get_parameters")
     FusionHTTPHandler.register_route("POST", "/query/timeline", "get_timeline")
     FusionHTTPHandler.register_route("GET", "/query/timeline", "get_timeline")
+
+
+def _register_creation_routes() -> None:
+    """Register HTTP routes for creation endpoints."""
+    # Phase 2: Body creation routes
+    FusionHTTPHandler.register_route("POST", "/create/box", "create_box")
+    FusionHTTPHandler.register_route("POST", "/create/cylinder", "create_cylinder")
+
+    # Phase 2: Sketch creation routes
+    FusionHTTPHandler.register_route("POST", "/create/sketch", "create_sketch")
+    FusionHTTPHandler.register_route("POST", "/sketch/line", "draw_line")
+    FusionHTTPHandler.register_route("POST", "/sketch/circle", "draw_circle")
+    FusionHTTPHandler.register_route("POST", "/sketch/rectangle", "draw_rectangle")
+    FusionHTTPHandler.register_route("POST", "/sketch/arc", "draw_arc")
+
+    # Phase 2: Feature creation routes
+    FusionHTTPHandler.register_route("POST", "/create/extrude", "extrude")
+    FusionHTTPHandler.register_route("POST", "/create/revolve", "revolve")
+    FusionHTTPHandler.register_route("POST", "/create/fillet", "fillet")
+    FusionHTTPHandler.register_route("POST", "/create/chamfer", "chamfer")
+    FusionHTTPHandler.register_route("POST", "/create/hole", "create_hole")
 
 
 def _show_message(message: str) -> None:

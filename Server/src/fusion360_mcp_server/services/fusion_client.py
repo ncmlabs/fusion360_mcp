@@ -375,3 +375,382 @@ class FusionClient:
             return result.get("status") == "ok"
         except Exception:
             return False
+
+    # --- Creation Methods ---
+
+    async def create_box(
+        self,
+        width: float,
+        depth: float,
+        height: float,
+        x: float = 0.0,
+        y: float = 0.0,
+        z: float = 0.0,
+        name: Optional[str] = None,
+        plane: str = "XY",
+        component_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a box (rectangular prism).
+
+        Args:
+            width: Box width in mm
+            depth: Box depth in mm
+            height: Box height in mm
+            x: X position of center in mm
+            y: Y position of center in mm
+            z: Z position/offset in mm
+            name: Optional name for the body
+            plane: Construction plane (XY, YZ, XZ)
+            component_id: Optional component ID
+
+        Returns:
+            Dict with body and feature info
+        """
+        return await self._request("POST", "/create/box", {
+            "width": width,
+            "depth": depth,
+            "height": height,
+            "x": x,
+            "y": y,
+            "z": z,
+            "name": name,
+            "plane": plane,
+            "component_id": component_id,
+        })
+
+    async def create_cylinder(
+        self,
+        radius: float,
+        height: float,
+        x: float = 0.0,
+        y: float = 0.0,
+        z: float = 0.0,
+        name: Optional[str] = None,
+        plane: str = "XY",
+        component_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a cylinder.
+
+        Args:
+            radius: Cylinder radius in mm
+            height: Cylinder height in mm
+            x: X position of center in mm
+            y: Y position of center in mm
+            z: Z position/offset in mm
+            name: Optional name for the body
+            plane: Construction plane (XY, YZ, XZ)
+            component_id: Optional component ID
+
+        Returns:
+            Dict with body and feature info
+        """
+        return await self._request("POST", "/create/cylinder", {
+            "radius": radius,
+            "height": height,
+            "x": x,
+            "y": y,
+            "z": z,
+            "name": name,
+            "plane": plane,
+            "component_id": component_id,
+        })
+
+    async def create_sketch(
+        self,
+        plane: str = "XY",
+        name: Optional[str] = None,
+        offset: float = 0.0,
+        component_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a new sketch.
+
+        Args:
+            plane: Construction plane (XY, YZ, XZ) or face_id
+            name: Optional name for the sketch
+            offset: Offset from plane in mm
+            component_id: Optional component ID
+
+        Returns:
+            Dict with sketch info
+        """
+        return await self._request("POST", "/create/sketch", {
+            "plane": plane,
+            "name": name,
+            "offset": offset,
+            "component_id": component_id,
+        })
+
+    async def draw_line(
+        self,
+        sketch_id: str,
+        start_x: float,
+        start_y: float,
+        end_x: float,
+        end_y: float,
+    ) -> Dict[str, Any]:
+        """Draw a line in a sketch.
+
+        Args:
+            sketch_id: ID of the sketch
+            start_x: Start X coordinate in mm
+            start_y: Start Y coordinate in mm
+            end_x: End X coordinate in mm
+            end_y: End Y coordinate in mm
+
+        Returns:
+            Dict with curve info
+        """
+        return await self._request("POST", "/sketch/line", {
+            "sketch_id": sketch_id,
+            "start_x": start_x,
+            "start_y": start_y,
+            "end_x": end_x,
+            "end_y": end_y,
+        })
+
+    async def draw_circle(
+        self,
+        sketch_id: str,
+        center_x: float,
+        center_y: float,
+        radius: float,
+    ) -> Dict[str, Any]:
+        """Draw a circle in a sketch.
+
+        Args:
+            sketch_id: ID of the sketch
+            center_x: Center X coordinate in mm
+            center_y: Center Y coordinate in mm
+            radius: Circle radius in mm
+
+        Returns:
+            Dict with curve info
+        """
+        return await self._request("POST", "/sketch/circle", {
+            "sketch_id": sketch_id,
+            "center_x": center_x,
+            "center_y": center_y,
+            "radius": radius,
+        })
+
+    async def draw_rectangle(
+        self,
+        sketch_id: str,
+        x1: float,
+        y1: float,
+        x2: float,
+        y2: float,
+    ) -> Dict[str, Any]:
+        """Draw a rectangle in a sketch.
+
+        Args:
+            sketch_id: ID of the sketch
+            x1: First corner X in mm
+            y1: First corner Y in mm
+            x2: Opposite corner X in mm
+            y2: Opposite corner Y in mm
+
+        Returns:
+            Dict with curve info
+        """
+        return await self._request("POST", "/sketch/rectangle", {
+            "sketch_id": sketch_id,
+            "x1": x1,
+            "y1": y1,
+            "x2": x2,
+            "y2": y2,
+        })
+
+    async def draw_arc(
+        self,
+        sketch_id: str,
+        center_x: float,
+        center_y: float,
+        radius: float,
+        start_angle: float,
+        end_angle: float,
+    ) -> Dict[str, Any]:
+        """Draw an arc in a sketch.
+
+        Args:
+            sketch_id: ID of the sketch
+            center_x: Center X coordinate in mm
+            center_y: Center Y coordinate in mm
+            radius: Arc radius in mm
+            start_angle: Start angle in degrees
+            end_angle: End angle in degrees
+
+        Returns:
+            Dict with curve info
+        """
+        return await self._request("POST", "/sketch/arc", {
+            "sketch_id": sketch_id,
+            "center_x": center_x,
+            "center_y": center_y,
+            "radius": radius,
+            "start_angle": start_angle,
+            "end_angle": end_angle,
+        })
+
+    async def extrude(
+        self,
+        sketch_id: str,
+        distance: float,
+        direction: str = "positive",
+        operation: str = "new_body",
+        profile_index: int = 0,
+        name: Optional[str] = None,
+        taper_angle: float = 0.0,
+    ) -> Dict[str, Any]:
+        """Extrude a sketch profile.
+
+        Args:
+            sketch_id: ID of the sketch
+            distance: Extrusion distance in mm
+            direction: "positive", "negative", or "symmetric"
+            operation: "new_body", "join", "cut", "intersect"
+            profile_index: Index of profile to extrude
+            name: Optional name for created body
+            taper_angle: Taper angle in degrees
+
+        Returns:
+            Dict with feature and body info
+        """
+        return await self._request("POST", "/create/extrude", {
+            "sketch_id": sketch_id,
+            "distance": distance,
+            "direction": direction,
+            "operation": operation,
+            "profile_index": profile_index,
+            "name": name,
+            "taper_angle": taper_angle,
+        })
+
+    async def revolve(
+        self,
+        sketch_id: str,
+        axis: str,
+        angle: float = 360.0,
+        operation: str = "new_body",
+        profile_index: int = 0,
+        name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Revolve a sketch profile around an axis.
+
+        Args:
+            sketch_id: ID of the sketch
+            axis: Axis to revolve around ("X", "Y", "Z")
+            angle: Revolution angle in degrees
+            operation: "new_body", "join", "cut", "intersect"
+            profile_index: Index of profile to revolve
+            name: Optional name for created body
+
+        Returns:
+            Dict with feature and body info
+        """
+        return await self._request("POST", "/create/revolve", {
+            "sketch_id": sketch_id,
+            "axis": axis,
+            "angle": angle,
+            "operation": operation,
+            "profile_index": profile_index,
+            "name": name,
+        })
+
+    async def fillet(
+        self,
+        body_id: str,
+        edge_ids: List[str],
+        radius: float,
+    ) -> Dict[str, Any]:
+        """Apply fillet to edges.
+
+        Args:
+            body_id: ID of the body
+            edge_ids: List of edge IDs to fillet
+            radius: Fillet radius in mm
+
+        Returns:
+            Dict with feature info
+        """
+        return await self._request("POST", "/create/fillet", {
+            "body_id": body_id,
+            "edge_ids": edge_ids,
+            "radius": radius,
+        })
+
+    async def chamfer(
+        self,
+        body_id: str,
+        edge_ids: List[str],
+        distance: float,
+        distance2: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Apply chamfer to edges.
+
+        Args:
+            body_id: ID of the body
+            edge_ids: List of edge IDs to chamfer
+            distance: Chamfer distance in mm
+            distance2: Optional second distance for asymmetric chamfer
+
+        Returns:
+            Dict with feature info
+        """
+        data = {
+            "body_id": body_id,
+            "edge_ids": edge_ids,
+            "distance": distance,
+        }
+        if distance2 is not None:
+            data["distance2"] = distance2
+        return await self._request("POST", "/create/chamfer", data)
+
+    async def create_hole(
+        self,
+        diameter: float,
+        depth: float,
+        body_id: Optional[str] = None,
+        face_id: Optional[str] = None,
+        x: float = 0.0,
+        y: float = 0.0,
+        name: Optional[str] = None,
+        hole_type: str = "simple",
+        countersink_angle: float = 90.0,
+        countersink_diameter: float = 0.0,
+        counterbore_diameter: float = 0.0,
+        counterbore_depth: float = 0.0,
+    ) -> Dict[str, Any]:
+        """Create a hole in a body.
+
+        Args:
+            diameter: Hole diameter in mm
+            depth: Hole depth in mm
+            body_id: ID of the body (optional if face_id provided)
+            face_id: ID of the face to place hole on
+            x: X position in mm
+            y: Y position in mm
+            name: Optional name for the feature
+            hole_type: "simple", "countersink", or "counterbore"
+            countersink_angle: Countersink angle in degrees
+            countersink_diameter: Countersink diameter in mm
+            counterbore_diameter: Counterbore diameter in mm
+            counterbore_depth: Counterbore depth in mm
+
+        Returns:
+            Dict with feature info
+        """
+        return await self._request("POST", "/create/hole", {
+            "body_id": body_id,
+            "face_id": face_id,
+            "x": x,
+            "y": y,
+            "diameter": diameter,
+            "depth": depth,
+            "name": name,
+            "hole_type": hole_type,
+            "countersink_angle": countersink_angle,
+            "countersink_diameter": countersink_diameter,
+            "counterbore_diameter": counterbore_diameter,
+            "counterbore_depth": counterbore_depth,
+        })
