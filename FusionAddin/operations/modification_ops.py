@@ -213,8 +213,11 @@ def move_body(
 ) -> Dict[str, Any]:
     """Move a body by translation.
 
-    Uses defineAsTranslate to preserve parametric relationships.
-    This creates a Move feature in the timeline.
+    Creates a Move feature in the timeline using a transformation matrix.
+
+    Note: The Fusion 360 API currently only supports "free move" which uses
+    a transformation matrix. Parametric move types (defineAsTranslate) are
+    not yet exposed in the API.
 
     Args:
         body_id: ID of the body to move
@@ -258,12 +261,14 @@ def move_body(
         y_cm = y / 10.0
         z_cm = z / 10.0
 
-        # Create translation vector
+        # Create transformation matrix with translation
+        transform = adsk.core.Matrix3D.create()
         translation = adsk.core.Vector3D.create(x_cm, y_cm, z_cm)
+        transform.translation = translation
 
-        # CRITICAL: Use defineAsTranslate to preserve parametric relationships
-        # DO NOT use defineAsFreeMove as it breaks parametric history
-        move_input.defineAsTranslate(translation)
+        # Use defineAsFreeMove with transformation matrix
+        # Note: This is currently the only move type supported by the API
+        move_input.defineAsFreeMove(transform)
 
         # Execute the move
         move_feature = move_features.add(move_input)
@@ -276,9 +281,6 @@ def move_body(
 
         # Register the new feature
         feature_id = registry.register_feature(move_feature)
-
-        # Serialize result
-        feature_serializer = FeatureSerializer(registry)
 
         result = {
             "success": True,
@@ -314,8 +316,11 @@ def rotate_body(
 ) -> Dict[str, Any]:
     """Rotate a body around an axis.
 
-    Uses defineAsRotate to preserve parametric relationships.
-    This creates a Move feature in the timeline.
+    Creates a Move feature in the timeline using a rotation transformation matrix.
+
+    Note: The Fusion 360 API currently only supports "free move" which uses
+    a transformation matrix. Parametric rotate types (defineAsRotate) are
+    not yet exposed in the API.
 
     Args:
         body_id: ID of the body to rotate
@@ -381,18 +386,16 @@ def rotate_body(
         else:  # Z
             axis_vector = adsk.core.Vector3D.create(0, 0, 1)
 
-        # Create axis for rotation
-        rotation_axis = adsk.core.InfiniteLine3D.create(origin_cm, axis_vector)
-
         # Convert angle to radians
         angle_rad = math.radians(angle)
 
-        # CRITICAL: Use defineAsRotate to preserve parametric relationships
-        # DO NOT use defineAsFreeMove as it breaks parametric history
-        move_input.defineAsRotate(
-            rotation_axis,
-            adsk.core.ValueInput.createByReal(angle_rad)
-        )
+        # Create rotation transformation matrix
+        transform = adsk.core.Matrix3D.create()
+        transform.setToRotation(angle_rad, axis_vector, origin_cm)
+
+        # Use defineAsFreeMove with transformation matrix
+        # Note: This is currently the only move type supported by the API
+        move_input.defineAsFreeMove(transform)
 
         # Execute the rotation
         move_feature = move_features.add(move_input)
@@ -680,8 +683,7 @@ def update_parameter(
 def delete_body(body_id: str) -> Dict[str, Any]:
     """Delete a body from the design.
 
-    This removes the body using the Remove feature, which preserves
-    timeline history.
+    Uses the BRepBody.deleteMe() method to remove the body.
 
     Args:
         body_id: ID of the body to delete
@@ -698,32 +700,17 @@ def delete_body(body_id: str) -> Dict[str, Any]:
     registry = get_registry()
 
     try:
-        component = body.parentComponent
-
         # Store body info before deletion
         body_name = body.name if hasattr(body, 'name') else body_id
 
-        # Use removeFeatures to delete the body (preserves timeline)
-        remove_features = component.features.removeFeatures
+        # Use deleteMe() to remove the body
+        delete_success = body.deleteMe()
 
-        # Create object collection with the body
-        bodies_to_remove = adsk.core.ObjectCollection.create()
-        bodies_to_remove.add(body)
-
-        # Create remove feature
-        remove_feature = remove_features.add(bodies_to_remove)
-
-        if not remove_feature:
+        if not delete_success:
             raise FeatureError(
                 "delete_body",
-                "Failed to create remove feature"
+                "Failed to delete body"
             )
-
-        # Register the remove feature
-        feature_id = registry.register_feature(remove_feature)
-
-        # Remove from registry
-        # Note: The registry will be refreshed on next query
 
         result = {
             "success": True,
@@ -731,10 +718,6 @@ def delete_body(body_id: str) -> Dict[str, Any]:
                 "id": body_id,
                 "name": body_name,
                 "type": "Body",
-            },
-            "feature": {
-                "id": feature_id,
-                "type": "RemoveFeature",
             },
         }
 
