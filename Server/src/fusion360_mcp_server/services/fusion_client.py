@@ -738,6 +738,153 @@ class FusionClient:
             "is_construction": is_construction,
         })
 
+    # --- Phase 7b: Sketch Patterns & Operations ---
+
+    async def sketch_mirror(
+        self,
+        sketch_id: str,
+        curve_ids: List[str],
+        mirror_line_id: str,
+    ) -> Dict[str, Any]:
+        """Mirror sketch entities across a line.
+
+        Args:
+            sketch_id: ID of the sketch
+            curve_ids: List of curve IDs to mirror
+            mirror_line_id: ID of the line to mirror across
+
+        Returns:
+            Dict with mirrored curve IDs and info
+        """
+        return await self._request("POST", "/sketch/mirror", {
+            "sketch_id": sketch_id,
+            "curve_ids": curve_ids,
+            "mirror_line_id": mirror_line_id,
+        })
+
+    async def sketch_circular_pattern(
+        self,
+        sketch_id: str,
+        curve_ids: List[str],
+        center_x: float,
+        center_y: float,
+        count: int,
+        total_angle: float = 360.0,
+    ) -> Dict[str, Any]:
+        """Create a circular pattern of sketch entities.
+
+        Args:
+            sketch_id: ID of the sketch
+            curve_ids: List of curve IDs to pattern
+            center_x: Pattern center X in mm
+            center_y: Pattern center Y in mm
+            count: Number of instances (including original)
+            total_angle: Total angle span in degrees
+
+        Returns:
+            Dict with pattern info and new curve IDs
+        """
+        return await self._request("POST", "/sketch/circular_pattern", {
+            "sketch_id": sketch_id,
+            "curve_ids": curve_ids,
+            "center_x": center_x,
+            "center_y": center_y,
+            "count": count,
+            "total_angle": total_angle,
+        })
+
+    async def sketch_rectangular_pattern(
+        self,
+        sketch_id: str,
+        curve_ids: List[str],
+        x_count: int,
+        y_count: int,
+        x_spacing: float,
+        y_spacing: float,
+    ) -> Dict[str, Any]:
+        """Create a rectangular pattern of sketch entities.
+
+        Args:
+            sketch_id: ID of the sketch
+            curve_ids: List of curve IDs to pattern
+            x_count: Number of columns
+            y_count: Number of rows
+            x_spacing: Column spacing in mm
+            y_spacing: Row spacing in mm
+
+        Returns:
+            Dict with pattern info and new curve IDs
+        """
+        return await self._request("POST", "/sketch/rectangular_pattern", {
+            "sketch_id": sketch_id,
+            "curve_ids": curve_ids,
+            "x_count": x_count,
+            "y_count": y_count,
+            "x_spacing": x_spacing,
+            "y_spacing": y_spacing,
+        })
+
+    async def project_geometry(
+        self,
+        sketch_id: str,
+        entity_ids: List[str],
+        project_type: str = "standard",
+    ) -> Dict[str, Any]:
+        """Project edges or faces from 3D bodies onto a sketch.
+
+        Args:
+            sketch_id: ID of the target sketch
+            entity_ids: List of entity IDs to project
+            project_type: "standard" or "cut_edges"
+
+        Returns:
+            Dict with projected curve IDs and info
+        """
+        return await self._request("POST", "/sketch/project", {
+            "sketch_id": sketch_id,
+            "entity_ids": entity_ids,
+            "project_type": project_type,
+        })
+
+    async def add_sketch_text(
+        self,
+        sketch_id: str,
+        text: str,
+        x: float,
+        y: float,
+        height: float,
+        font_name: Optional[str] = None,
+        is_bold: bool = False,
+        is_italic: bool = False,
+    ) -> Dict[str, Any]:
+        """Add text to a sketch for engraving or embossing.
+
+        Args:
+            sketch_id: ID of the target sketch
+            text: Text content
+            x: Text position X in mm
+            y: Text position Y in mm
+            height: Text height in mm
+            font_name: Font name (optional)
+            is_bold: Bold text
+            is_italic: Italic text
+
+        Returns:
+            Dict with text info and profiles
+        """
+        data: Dict[str, Any] = {
+            "sketch_id": sketch_id,
+            "text": text,
+            "x": x,
+            "y": y,
+            "height": height,
+            "is_bold": is_bold,
+            "is_italic": is_italic,
+        }
+        if font_name is not None:
+            data["font_name"] = font_name
+        return await self._request("POST", "/sketch/text", data)
+
     async def extrude(
         self,
         sketch_id: str,

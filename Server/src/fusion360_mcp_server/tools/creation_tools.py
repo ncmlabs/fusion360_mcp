@@ -1065,4 +1065,364 @@ def register_creation_tools(mcp: FastMCP) -> None:
                 hole_type=hole_type,
             )
 
+    # --- Phase 7b: Sketch Patterns & Operations ---
+
+    @mcp.tool()
+    async def sketch_mirror(
+        sketch_id: str,
+        curve_ids: List[str],
+        mirror_line_id: str,
+    ) -> dict:
+        """Mirror sketch entities across a line.
+
+        Creates mirrored copies of the specified curves across a mirror line,
+        useful for creating symmetric geometry.
+
+        Args:
+            sketch_id: ID of the sketch containing the curves.
+            curve_ids: List of curve IDs to mirror. Get these from draw_* operations
+                      or get_sketch_by_id.
+            mirror_line_id: ID of the line to mirror across. Must be a SketchLine
+                           (not a circle or arc).
+
+        Returns:
+            Dict containing:
+            - success: True if mirror succeeded
+            - mirrored_curves: List of new curve IDs created
+            - original_curves: Original curve IDs that were mirrored
+            - mirror_line_id: The mirror line used
+            - sketch_id: The sketch ID
+            - profiles_count: Number of closed profiles in sketch
+
+        Example:
+            # Draw a rectangle and mirror it across a vertical centerline
+            sketch = await create_sketch(plane="XY")
+            sketch_id = sketch["sketch"]["id"]
+
+            # Draw rectangle on left side
+            rect = await draw_rectangle(sketch_id=sketch_id, x1=-50, y1=0, x2=-10, y2=30)
+
+            # Draw vertical centerline
+            line = await draw_line(sketch_id=sketch_id, start_x=0, start_y=-10, end_x=0, end_y=40)
+
+            # Mirror rectangle across centerline
+            result = await sketch_mirror(
+                sketch_id=sketch_id,
+                curve_ids=rect["curves"],
+                mirror_line_id=line["curve"]["id"]
+            )
+        """
+        logger.info(
+            "sketch_mirror called",
+            sketch_id=sketch_id,
+            curve_count=len(curve_ids),
+            mirror_line_id=mirror_line_id,
+        )
+        async with FusionClient() as client:
+            return await client.sketch_mirror(
+                sketch_id=sketch_id,
+                curve_ids=curve_ids,
+                mirror_line_id=mirror_line_id,
+            )
+
+    @mcp.tool()
+    async def sketch_circular_pattern(
+        sketch_id: str,
+        curve_ids: List[str],
+        count: int,
+        center_x: float = 0.0,
+        center_y: float = 0.0,
+        total_angle: float = 360.0,
+    ) -> dict:
+        """Create a circular pattern of sketch entities.
+
+        Copies the specified curves in a circular array around a center point.
+        Commonly used for bolt hole patterns, gear teeth, and radial features.
+
+        **Coordinates in millimeters (mm), angles in degrees.**
+
+        Args:
+            sketch_id: ID of the sketch containing the curves.
+            curve_ids: List of curve IDs to pattern.
+            count: Total number of instances (including original). Must be 2-360.
+            center_x: Pattern center X coordinate in mm. Default 0.
+            center_y: Pattern center Y coordinate in mm. Default 0.
+            total_angle: Total angle span in degrees. Default 360 (full circle).
+                        Use smaller values for partial patterns.
+
+        Returns:
+            Dict containing:
+            - success: True if pattern succeeded
+            - pattern_curves: List of new curve IDs created (excludes original)
+            - original_curves: The original curve IDs
+            - pattern: Pattern info with type, center, count, angles
+            - sketch_id: The sketch ID
+            - profiles_count: Number of closed profiles
+
+        Example:
+            # Create a 6-hole bolt pattern
+            sketch = await create_sketch(plane="XY")
+            sketch_id = sketch["sketch"]["id"]
+
+            # Draw one mounting hole
+            hole = await draw_circle(sketch_id=sketch_id, center_x=40, center_y=0, radius=3)
+
+            # Create 6-hole pattern around origin
+            result = await sketch_circular_pattern(
+                sketch_id=sketch_id,
+                curve_ids=[hole["curve"]["id"]],
+                center_x=0, center_y=0,
+                count=6
+            )
+
+            # Create partial pattern (180 degrees, 4 instances)
+            result = await sketch_circular_pattern(
+                sketch_id=sketch_id,
+                curve_ids=[hole["curve"]["id"]],
+                count=4,
+                total_angle=180
+            )
+        """
+        logger.info(
+            "sketch_circular_pattern called",
+            sketch_id=sketch_id,
+            curve_count=len(curve_ids),
+            center_x=center_x,
+            center_y=center_y,
+            count=count,
+            total_angle=total_angle,
+        )
+        async with FusionClient() as client:
+            return await client.sketch_circular_pattern(
+                sketch_id=sketch_id,
+                curve_ids=curve_ids,
+                center_x=center_x,
+                center_y=center_y,
+                count=count,
+                total_angle=total_angle,
+            )
+
+    @mcp.tool()
+    async def sketch_rectangular_pattern(
+        sketch_id: str,
+        curve_ids: List[str],
+        x_count: int,
+        y_count: int,
+        x_spacing: float,
+        y_spacing: float,
+    ) -> dict:
+        """Create a rectangular pattern of sketch entities.
+
+        Copies the specified curves in a rectangular grid array.
+        Commonly used for mounting holes, ventilation patterns, and grid layouts.
+
+        **All dimensions in millimeters (mm).**
+
+        Args:
+            sketch_id: ID of the sketch containing the curves.
+            curve_ids: List of curve IDs to pattern.
+            x_count: Number of columns. Must be >= 1.
+            y_count: Number of rows. Must be >= 1.
+            x_spacing: Column spacing in mm (horizontal distance between copies).
+            y_spacing: Row spacing in mm (vertical distance between copies).
+
+        Returns:
+            Dict containing:
+            - success: True if pattern succeeded
+            - pattern_curves: List of new curve IDs created (excludes original)
+            - original_curves: The original curve IDs
+            - pattern: Pattern info with type, counts, spacing, total_instances
+            - sketch_id: The sketch ID
+            - profiles_count: Number of closed profiles
+
+        Example:
+            # Create a 4x3 grid of mounting slots
+            sketch = await create_sketch(plane="XY")
+            sketch_id = sketch["sketch"]["id"]
+
+            # Draw one slot
+            slot = await draw_slot(
+                sketch_id=sketch_id,
+                center_x=0, center_y=0,
+                length=15, width=5
+            )
+
+            # Create 4x3 pattern with 25mm horizontal and 20mm vertical spacing
+            result = await sketch_rectangular_pattern(
+                sketch_id=sketch_id,
+                curve_ids=slot["curves"],
+                x_count=4,
+                y_count=3,
+                x_spacing=25,
+                y_spacing=20
+            )
+        """
+        logger.info(
+            "sketch_rectangular_pattern called",
+            sketch_id=sketch_id,
+            curve_count=len(curve_ids),
+            x_count=x_count,
+            y_count=y_count,
+            x_spacing=x_spacing,
+            y_spacing=y_spacing,
+        )
+        async with FusionClient() as client:
+            return await client.sketch_rectangular_pattern(
+                sketch_id=sketch_id,
+                curve_ids=curve_ids,
+                x_count=x_count,
+                y_count=y_count,
+                x_spacing=x_spacing,
+                y_spacing=y_spacing,
+            )
+
+    @mcp.tool()
+    async def project_geometry(
+        sketch_id: str,
+        entity_ids: List[str],
+        project_type: str = "standard",
+    ) -> dict:
+        """Project edges or faces from 3D bodies onto a sketch.
+
+        Projects existing 3D geometry onto the sketch plane, creating reference
+        curves that can be used for further sketch operations. Useful for creating
+        features that reference existing geometry.
+
+        Args:
+            sketch_id: ID of the target sketch.
+            entity_ids: List of entity IDs to project. Can be:
+                       - Edge IDs (e.g., "Body1_edge_0")
+                       - Face IDs (e.g., "Body1_face_0")
+                       - Body IDs (e.g., "body_0") - projects all edges
+            project_type: Type of projection:
+                         - "standard": Regular projection (default)
+                         - "cut_edges": Project only edges that intersect the
+                           sketch plane (silhouette edges)
+
+        Returns:
+            Dict containing:
+            - success: True if projection succeeded
+            - projected_curves: List of new curve IDs created
+            - source_entities: The entities that were projected
+            - project_type: The projection type used
+            - sketch_id: The sketch ID
+            - curves_created: Number of curves created
+
+        Example:
+            # Create a box, then project its top face edges onto a new sketch
+            box = await create_box(width=50, depth=30, height=20)
+            body_id = box["body"]["id"]
+
+            # Get body details to find top face
+            body = await get_body_by_id(body_id=body_id, include_faces=True)
+
+            # Create a new sketch at Z=25 (above the box)
+            sketch = await create_sketch(plane="XY", offset=25)
+            sketch_id = sketch["sketch"]["id"]
+
+            # Project the box edges onto the new sketch
+            result = await project_geometry(
+                sketch_id=sketch_id,
+                entity_ids=[body_id]
+            )
+        """
+        logger.info(
+            "project_geometry called",
+            sketch_id=sketch_id,
+            entity_count=len(entity_ids),
+            project_type=project_type,
+        )
+        async with FusionClient() as client:
+            return await client.project_geometry(
+                sketch_id=sketch_id,
+                entity_ids=entity_ids,
+                project_type=project_type,
+            )
+
+    @mcp.tool()
+    async def add_sketch_text(
+        sketch_id: str,
+        text: str,
+        height: float,
+        x: float = 0.0,
+        y: float = 0.0,
+        font_name: Optional[str] = None,
+        is_bold: bool = False,
+        is_italic: bool = False,
+    ) -> dict:
+        """Add text to a sketch for engraving or embossing.
+
+        Creates sketch text that generates profiles suitable for extrusion,
+        enabling engraved or embossed text on parts. Useful for part numbers,
+        logos, labels, and decorative text.
+
+        **All dimensions in millimeters (mm).**
+
+        Args:
+            sketch_id: ID of the target sketch.
+            text: Text content to add. Cannot be empty.
+            height: Text height in mm. Must be positive. This is the height
+                   of capital letters.
+            x: Text position X coordinate in mm. Default 0. This is the
+               left edge of the text.
+            y: Text position Y coordinate in mm. Default 0. This is the
+               top edge of the text.
+            font_name: Optional font name. Uses system default if not specified.
+                      Common fonts: "Arial", "Times New Roman", "Courier New"
+            is_bold: Make text bold. Default False.
+            is_italic: Make text italic. Default False.
+
+        Returns:
+            Dict containing:
+            - success: True if text was created
+            - text: Text info with content, position, height, font settings
+            - curves: List of curve IDs created (text outlines)
+            - sketch_id: The sketch ID
+            - profiles_count: Number of closed profiles (for extrusion)
+
+        Example:
+            # Add a part number to a sketch for engraving
+            sketch = await create_sketch(plane="XY")
+            sketch_id = sketch["sketch"]["id"]
+
+            result = await add_sketch_text(
+                sketch_id=sketch_id,
+                text="PART-001",
+                height=5,
+                x=10, y=10,
+                font_name="Arial",
+                is_bold=True
+            )
+
+            # Extrude the text as a cut for engraving
+            await extrude(
+                sketch_id=sketch_id,
+                distance=0.5,
+                direction="negative",
+                operation="cut"
+            )
+        """
+        logger.info(
+            "add_sketch_text called",
+            sketch_id=sketch_id,
+            text=text,
+            height=height,
+            x=x,
+            y=y,
+            font_name=font_name,
+            is_bold=is_bold,
+            is_italic=is_italic,
+        )
+        async with FusionClient() as client:
+            return await client.add_sketch_text(
+                sketch_id=sketch_id,
+                text=text,
+                x=x,
+                y=y,
+                height=height,
+                font_name=font_name,
+                is_bold=is_bold,
+                is_italic=is_italic,
+            )
+
     logger.info("Creation tools registered")

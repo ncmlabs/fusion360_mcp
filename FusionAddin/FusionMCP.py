@@ -55,6 +55,12 @@ from handlers.creation_handlers import (
     handle_draw_slot,
     handle_draw_spline,
     handle_draw_point,
+    # Phase 7b: Sketch patterns & operations
+    handle_sketch_mirror,
+    handle_sketch_circular_pattern,
+    handle_sketch_rectangular_pattern,
+    handle_project_geometry,
+    handle_add_sketch_text,
     # Feature creation
     handle_extrude,
     handle_revolve,
@@ -218,6 +224,13 @@ def _register_task_handlers() -> None:
     _event_manager.register_task_handler("draw_spline", handle_draw_spline)
     _event_manager.register_task_handler("draw_point", handle_draw_point)
 
+    # Phase 7b: Sketch patterns & operations handlers
+    _event_manager.register_task_handler("sketch_mirror", handle_sketch_mirror)
+    _event_manager.register_task_handler("sketch_circular_pattern", handle_sketch_circular_pattern)
+    _event_manager.register_task_handler("sketch_rectangular_pattern", handle_sketch_rectangular_pattern)
+    _event_manager.register_task_handler("project_geometry", handle_project_geometry)
+    _event_manager.register_task_handler("add_sketch_text", handle_add_sketch_text)
+
     # Phase 2: Creation handlers - Features
     _event_manager.register_task_handler("extrude", handle_extrude)
     _event_manager.register_task_handler("revolve", handle_revolve)
@@ -278,6 +291,13 @@ def _register_creation_routes() -> None:
     FusionHTTPHandler.register_route("POST", "/sketch/slot", "draw_slot")
     FusionHTTPHandler.register_route("POST", "/sketch/spline", "draw_spline")
     FusionHTTPHandler.register_route("POST", "/sketch/point", "draw_point")
+
+    # Phase 7b: Sketch patterns & operations routes
+    FusionHTTPHandler.register_route("POST", "/sketch/mirror", "sketch_mirror")
+    FusionHTTPHandler.register_route("POST", "/sketch/circular_pattern", "sketch_circular_pattern")
+    FusionHTTPHandler.register_route("POST", "/sketch/rectangular_pattern", "sketch_rectangular_pattern")
+    FusionHTTPHandler.register_route("POST", "/sketch/project", "project_geometry")
+    FusionHTTPHandler.register_route("POST", "/sketch/text", "add_sketch_text")
 
     # Phase 2: Feature creation routes
     FusionHTTPHandler.register_route("POST", "/create/extrude", "extrude")
