@@ -10,6 +10,7 @@ from .tools import (
     register_creation_tools,
     register_modification_tools,
     register_validation_tools,
+    register_system_tools,
 )
 
 
@@ -107,6 +108,9 @@ def main() -> None:
 
     register_validation_tools(mcp)
     logger.info("Validation tools registered")
+
+    register_system_tools(mcp)
+    logger.info("System tools registered")
 
     # Determine transport
     transport = args.transport or config.server_transport
