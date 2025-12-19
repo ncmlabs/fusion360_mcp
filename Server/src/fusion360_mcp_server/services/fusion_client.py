@@ -5,19 +5,10 @@ HTTP server, with retry logic and response parsing.
 """
 
 import asyncio
-from typing import Optional, Dict, Any, TypeVar, Type, List
+from typing import Optional, Dict, Any, List
 import httpx
-from pydantic import BaseModel
 
 from ..config import get_config, ServerConfig
-from ..models import (
-    DesignInfo,
-    Body,
-    BodySummary,
-    Sketch,
-    SketchSummary,
-    Parameter,
-)
 from ..logging import get_logger
 
 # Import shared exceptions
@@ -34,7 +25,6 @@ from shared.exceptions import (
 )
 
 
-T = TypeVar('T', bound=BaseModel)
 logger = get_logger(__name__)
 
 

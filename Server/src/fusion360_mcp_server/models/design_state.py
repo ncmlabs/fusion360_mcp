@@ -6,7 +6,7 @@ Defines the complete design state representation including components and assemb
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from enum import Enum
-from .geometry import Point3D, Matrix3D, BoundingBox
+from .geometry import Matrix3D
 from .body import BodySummary
 from .sketch import SketchSummary
 from .feature import Parameter, Timeline
