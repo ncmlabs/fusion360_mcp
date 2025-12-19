@@ -18,6 +18,18 @@ from typing import Optional, Any, Dict
 from core.event_manager import EventManager
 from core.http_server import FusionHTTPServer, FusionHTTPHandler, ServerConfig, setup_default_routes
 from core.task_queue import reset as reset_task_queue
+from core.entity_registry import reset_registry
+
+# Import query handlers
+from handlers.query_handlers import (
+    handle_get_design_state,
+    handle_get_bodies,
+    handle_get_body_by_id,
+    handle_get_sketches,
+    handle_get_sketch_by_id,
+    handle_get_parameters,
+    handle_get_timeline,
+)
 
 
 # Global state
@@ -61,6 +73,7 @@ def run(context: Dict[str, Any]) -> None:
 
         # Setup HTTP routes
         setup_default_routes()
+        _register_query_routes()
 
         # Start HTTP server
         config = ServerConfig(host=HTTP_HOST, port=HTTP_PORT)
@@ -98,6 +111,9 @@ def stop(context: Dict[str, Any]) -> None:
         # Reset task queue
         reset_task_queue()
 
+        # Reset entity registry
+        reset_registry()
+
         # Clear routes
         FusionHTTPHandler.clear_routes()
 
@@ -120,10 +136,31 @@ def _register_task_handlers() -> None:
 
     # Health/test handlers (handled directly by HTTP server custom handlers)
 
-    # TODO: Register handlers for Phase 1+ features
-    # Example:
-    # _event_manager.register_task_handler("get_design_state", handle_get_design_state)
-    # _event_manager.register_task_handler("get_bodies", handle_get_bodies)
+    # Phase 1: Query handlers
+    _event_manager.register_task_handler("get_design_state", handle_get_design_state)
+    _event_manager.register_task_handler("get_bodies", handle_get_bodies)
+    _event_manager.register_task_handler("get_body_by_id", handle_get_body_by_id)
+    _event_manager.register_task_handler("get_sketches", handle_get_sketches)
+    _event_manager.register_task_handler("get_sketch_by_id", handle_get_sketch_by_id)
+    _event_manager.register_task_handler("get_parameters", handle_get_parameters)
+    _event_manager.register_task_handler("get_timeline", handle_get_timeline)
+
+
+def _register_query_routes() -> None:
+    """Register HTTP routes for query endpoints."""
+    # Phase 1: Query routes
+    FusionHTTPHandler.register_route("POST", "/query/design_state", "get_design_state")
+    FusionHTTPHandler.register_route("GET", "/query/design_state", "get_design_state")
+    FusionHTTPHandler.register_route("POST", "/query/bodies", "get_bodies")
+    FusionHTTPHandler.register_route("GET", "/query/bodies", "get_bodies")
+    FusionHTTPHandler.register_route("POST", "/query/body", "get_body_by_id")
+    FusionHTTPHandler.register_route("POST", "/query/sketches", "get_sketches")
+    FusionHTTPHandler.register_route("GET", "/query/sketches", "get_sketches")
+    FusionHTTPHandler.register_route("POST", "/query/sketch", "get_sketch_by_id")
+    FusionHTTPHandler.register_route("POST", "/query/parameters", "get_parameters")
+    FusionHTTPHandler.register_route("GET", "/query/parameters", "get_parameters")
+    FusionHTTPHandler.register_route("POST", "/query/timeline", "get_timeline")
+    FusionHTTPHandler.register_route("GET", "/query/timeline", "get_timeline")
 
 
 def _show_message(message: str) -> None:
