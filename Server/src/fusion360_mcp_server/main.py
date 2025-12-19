@@ -1,8 +1,31 @@
 """Main entry point for Fusion 360 MCP Server."""
 
 import argparse
+from mcp.server.fastmcp import FastMCP
+
 from .config import get_config
 from .logging import setup_logging, get_logger
+from .tools import register_query_tools
+
+
+# Create FastMCP server instance
+mcp = FastMCP(
+    "Fusion360",
+    instructions="""You are an assistant for Fusion 360 CAD design.
+
+WORKFLOW:
+1. Use get_design_state() first to understand the current design context
+2. Use get_bodies() and get_sketches() to explore existing geometry
+3. Use get_body_by_id() or get_sketch_by_id() for detailed information
+4. Entity IDs from query results can be used in modification operations
+
+IMPORTANT:
+- Always query the design state before making changes
+- Use the returned entity IDs for referencing bodies and sketches
+- Check body.is_solid to know if you're working with solid or surface geometry
+- Check sketch.is_fully_constrained to know if a sketch is ready for extrusion
+""",
+)
 
 
 def main() -> None:
@@ -28,14 +51,27 @@ def main() -> None:
 
     # Get configuration
     config = get_config()
+
+    # Apply port override if provided
+    if args.port:
+        config.fusion_port = args.port
+
     logger.info(
         "Starting Fusion 360 MCP Server",
         fusion_url=config.fusion_base_url,
         transport=args.transport or config.server_transport,
     )
 
-    # TODO: Initialize MCP server with tools (Phase 1+)
-    logger.info("Server infrastructure ready - tools will be added in Phase 1")
+    # Register tools
+    register_query_tools(mcp)
+    logger.info("Query tools registered")
+
+    # Determine transport
+    transport = args.transport or config.server_transport
+
+    # Run MCP server
+    logger.info("Starting MCP server", transport=transport)
+    mcp.run(transport=transport)
 
 
 if __name__ == "__main__":

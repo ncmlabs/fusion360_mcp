@@ -18,6 +18,11 @@ from .http_server import (
     FusionHTTPHandler,
     ServerConfig,
 )
+from .entity_registry import (
+    EntityRegistry,
+    get_registry,
+    reset_registry,
+)
 
 __all__ = [
     # Task Queue
@@ -36,4 +41,8 @@ __all__ = [
     "FusionHTTPServer",
     "FusionHTTPHandler",
     "ServerConfig",
+    # Entity Registry
+    "EntityRegistry",
+    "get_registry",
+    "reset_registry",
 ]
