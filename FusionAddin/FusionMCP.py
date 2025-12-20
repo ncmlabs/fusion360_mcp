@@ -113,10 +113,6 @@ from handlers.modification_handlers import (
     handle_combine,
     handle_split_body,
     handle_shell,
-    handle_draft,
-    handle_scale,
-    handle_offset_face,
-    handle_split_face,
 )
 
 # Import validation handlers
@@ -352,10 +348,6 @@ def _register_task_handlers() -> None:
     _event_manager.register_task_handler("combine", handle_combine)
     _event_manager.register_task_handler("split_body", handle_split_body)
     _event_manager.register_task_handler("shell", handle_shell)
-    _event_manager.register_task_handler("draft", handle_draft)
-    _event_manager.register_task_handler("scale", handle_scale)
-    _event_manager.register_task_handler("offset_face", handle_offset_face)
-    _event_manager.register_task_handler("split_face", handle_split_face)
 
     # Phase 4: Validation handlers
     _event_manager.register_task_handler("measure_distance", handle_measure_distance)
@@ -498,10 +490,6 @@ def _register_modification_routes() -> None:
     FusionHTTPHandler.register_route("POST", "/modify/combine", "combine")
     FusionHTTPHandler.register_route("POST", "/modify/split_body", "split_body")
     FusionHTTPHandler.register_route("POST", "/modify/shell", "shell")
-    FusionHTTPHandler.register_route("POST", "/modify/draft", "draft")
-    FusionHTTPHandler.register_route("POST", "/modify/scale", "scale")
-    FusionHTTPHandler.register_route("POST", "/modify/offset_face", "offset_face")
-    FusionHTTPHandler.register_route("POST", "/modify/split_face", "split_face")
 
 
 def _register_validation_routes() -> None:

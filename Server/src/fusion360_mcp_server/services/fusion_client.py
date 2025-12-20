@@ -1285,108 +1285,12 @@ class FusionClient:
             "direction": direction,
         })
 
-    async def draft(
-        self,
-        face_ids: List[str],
-        plane: str,
-        angle: float,
-        is_tangent_chain: bool = True,
-    ) -> Dict[str, Any]:
-        """Add draft angle to faces for mold release.
-
-        Args:
-            face_ids: List of face IDs to draft
-            plane: Pull direction plane (face_id or "XY"/"YZ"/"XZ")
-            angle: Draft angle in degrees
-            is_tangent_chain: If True, include tangent-connected faces
-
-        Returns:
-            Dict with feature info
-        """
-        return await self._request("POST", "/modify/draft", {
-            "face_ids": face_ids,
-            "plane": plane,
-            "angle": angle,
-            "is_tangent_chain": is_tangent_chain,
-        })
-
-    async def scale(
-        self,
-        body_ids: List[str],
-        scale_factor: float = 1.0,
-        point_x: float = 0.0,
-        point_y: float = 0.0,
-        point_z: float = 0.0,
-        x_scale: Optional[float] = None,
-        y_scale: Optional[float] = None,
-        z_scale: Optional[float] = None,
-    ) -> Dict[str, Any]:
-        """Scale bodies uniformly or non-uniformly.
-
-        Args:
-            body_ids: List of body IDs to scale
-            scale_factor: Uniform scale factor (default 1.0)
-            point_x/y/z: Scale origin in mm
-            x_scale/y_scale/z_scale: Non-uniform scale factors
-
-        Returns:
-            Dict with feature info and scaled bodies
-        """
-        data = {
-            "body_ids": body_ids,
-            "scale_factor": scale_factor,
-            "point_x": point_x,
-            "point_y": point_y,
-            "point_z": point_z,
-        }
-        if x_scale is not None:
-            data["x_scale"] = x_scale
-        if y_scale is not None:
-            data["y_scale"] = y_scale
-        if z_scale is not None:
-            data["z_scale"] = z_scale
-        return await self._request("POST", "/modify/scale", data)
-
-    async def offset_face(
-        self,
-        face_ids: List[str],
-        distance: float,
-    ) -> Dict[str, Any]:
-        """Offset faces to add or remove material.
-
-        Args:
-            face_ids: List of face IDs to offset
-            distance: Offset distance in mm (positive=outward, negative=inward)
-
-        Returns:
-            Dict with feature info
-        """
-        return await self._request("POST", "/modify/offset_face", {
-            "face_ids": face_ids,
-            "distance": distance,
-        })
-
-    async def split_face(
-        self,
-        face_ids: List[str],
-        splitting_tool: str,
-        extend_splitting_tool: bool = True,
-    ) -> Dict[str, Any]:
-        """Split faces using edges or curves.
-
-        Args:
-            face_ids: List of face IDs to split
-            splitting_tool: Edge ID, curve ID, or sketch ID
-            extend_splitting_tool: If True, extend tool to fully split faces
-
-        Returns:
-            Dict with feature info
-        """
-        return await self._request("POST", "/modify/split_face", {
-            "face_ids": face_ids,
-            "splitting_tool": splitting_tool,
-            "extend_splitting_tool": extend_splitting_tool,
-        })
+    # NOTE: The following methods are implemented but disabled pending debugging:
+    # - draft: Add draft angle to faces
+    # - scale: Scale bodies
+    # - offset_face: Offset faces
+    # - split_face: Split faces
+    # See feature_ops.py in the add-in for the core implementations.
 
     # --- Validation Methods ---
 

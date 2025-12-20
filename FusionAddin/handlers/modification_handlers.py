@@ -19,10 +19,6 @@ from operations.feature_ops import (
     combine,
     split_body,
     shell,
-    draft,
-    scale,
-    offset_face,
-    split_face,
 )
 from shared.exceptions import InvalidParameterError
 
@@ -357,127 +353,9 @@ def handle_shell(args: Dict[str, Any]) -> Dict[str, Any]:
     )
 
 
-def handle_draft(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle draft request.
-
-    Adds draft angle to faces for mold release.
-
-    Args:
-        args: Request arguments
-            - face_ids: List of face IDs to draft (required)
-            - plane: Pull direction plane (required)
-            - angle: Draft angle in degrees (required)
-            - is_tangent_chain: Include tangent faces (default True)
-
-    Returns:
-        Dict with success and feature info
-    """
-    if "face_ids" not in args:
-        raise InvalidParameterError("face_ids", None, reason="face_ids is required")
-    if "plane" not in args:
-        raise InvalidParameterError("plane", None, reason="plane is required")
-    if "angle" not in args:
-        raise InvalidParameterError("angle", None, reason="angle is required")
-
-    face_ids = args["face_ids"]
-    if not isinstance(face_ids, list):
-        face_ids = [face_ids]
-
-    return draft(
-        face_ids=face_ids,
-        plane=args["plane"],
-        angle=float(args["angle"]),
-        is_tangent_chain=bool(args.get("is_tangent_chain", True)),
-    )
-
-
-def handle_scale(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle scale request.
-
-    Scales bodies uniformly or non-uniformly.
-
-    Args:
-        args: Request arguments
-            - body_ids: List of body IDs to scale (required)
-            - scale_factor: Uniform scale factor (default 1.0)
-            - point_x/y/z: Scale origin in mm (default 0)
-            - x_scale/y_scale/z_scale: Non-uniform scale factors
-
-    Returns:
-        Dict with success, feature info, and scaled bodies
-    """
-    if "body_ids" not in args:
-        raise InvalidParameterError("body_ids", None, reason="body_ids is required")
-
-    body_ids = args["body_ids"]
-    if not isinstance(body_ids, list):
-        body_ids = [body_ids]
-
-    return scale(
-        body_ids=body_ids,
-        scale_factor=float(args.get("scale_factor", 1.0)),
-        point_x=float(args.get("point_x", 0)),
-        point_y=float(args.get("point_y", 0)),
-        point_z=float(args.get("point_z", 0)),
-        x_scale=float(args["x_scale"]) if args.get("x_scale") is not None else None,
-        y_scale=float(args["y_scale"]) if args.get("y_scale") is not None else None,
-        z_scale=float(args["z_scale"]) if args.get("z_scale") is not None else None,
-    )
-
-
-def handle_offset_face(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle offset_face request.
-
-    Offsets faces to add or remove material (Press Pull for faces).
-
-    Args:
-        args: Request arguments
-            - face_ids: List of face IDs to offset (required)
-            - distance: Offset distance in mm (required)
-
-    Returns:
-        Dict with success and feature info
-    """
-    if "face_ids" not in args:
-        raise InvalidParameterError("face_ids", None, reason="face_ids is required")
-    if "distance" not in args:
-        raise InvalidParameterError("distance", None, reason="distance is required")
-
-    face_ids = args["face_ids"]
-    if not isinstance(face_ids, list):
-        face_ids = [face_ids]
-
-    return offset_face(
-        face_ids=face_ids,
-        distance=float(args["distance"]),
-    )
-
-
-def handle_split_face(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle split_face request.
-
-    Splits faces using edges or curves.
-
-    Args:
-        args: Request arguments
-            - face_ids: List of face IDs to split (required)
-            - splitting_tool: Edge ID, curve ID, or sketch ID (required)
-            - extend_splitting_tool: Extend tool to fully split (default True)
-
-    Returns:
-        Dict with success and feature info
-    """
-    if "face_ids" not in args:
-        raise InvalidParameterError("face_ids", None, reason="face_ids is required")
-    if "splitting_tool" not in args:
-        raise InvalidParameterError("splitting_tool", None, reason="splitting_tool is required")
-
-    face_ids = args["face_ids"]
-    if not isinstance(face_ids, list):
-        face_ids = [face_ids]
-
-    return split_face(
-        face_ids=face_ids,
-        splitting_tool=args["splitting_tool"],
-        extend_splitting_tool=bool(args.get("extend_splitting_tool", True)),
-    )
+# NOTE: The following handlers are implemented but disabled pending debugging:
+# - handle_draft: Add draft angle to faces
+# - handle_scale: Scale bodies
+# - handle_offset_face: Offset faces
+# - handle_split_face: Split faces
+# See feature_ops.py for the core implementations.

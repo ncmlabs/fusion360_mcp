@@ -94,7 +94,7 @@ This guide helps LLMs quickly identify the right tools and workflows when workin
 | `create_thread(face_id, thread_type, thread_size, ...)` | Add threads | Cylindrical face |
 | `create_coil(...)` | **NOT SUPPORTED** | Use sweep workaround |
 
-### Modification Tools (14 tools)
+### Modification Tools (10 tools)
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
 | `move_body(body_id, x?, y?, z?)` | Translate body | Offset in mm |
@@ -107,10 +107,6 @@ This guide helps LLMs quickly identify the right tools and workflows when workin
 | `combine(target_body_id, tool_body_ids, operation?, keep_tools?)` | Boolean combine | "join", "cut", "intersect" |
 | `split_body(body_id, splitting_tool, extend?)` | Split into parts | "XY"/"YZ"/"XZ" or face_id |
 | `shell(body_id, face_ids, thickness, direction?)` | Create hollow shell | Remove faces, add walls |
-| `draft(face_ids, plane, angle, is_tangent_chain?)` | Add draft angle | For mold release |
-| `scale(body_ids, scale_factor?, point_x/y/z?, x/y/z_scale?)` | Scale bodies | Uniform or non-uniform |
-| `offset_face(face_ids, distance)` | Push/pull faces | + outward, - inward |
-| `split_face(face_ids, splitting_tool, extend?)` | Split faces | Edge or sketch curve |
 
 ### Validation Tools (5 tools)
 | Tool | Purpose | Key Parameters |
