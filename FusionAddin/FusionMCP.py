@@ -115,6 +115,15 @@ from handlers.validation_handlers import (
     handle_get_sketch_status,
 )
 
+# Import viewport handlers
+from handlers.viewport_handlers import (
+    handle_take_screenshot,
+    handle_set_camera,
+    handle_get_camera,
+    handle_set_view,
+    handle_fit_view,
+)
+
 
 # Global state
 _app: Optional[Any] = None
@@ -161,6 +170,7 @@ def run(context: Dict[str, Any]) -> None:
         _register_creation_routes()
         _register_modification_routes()
         _register_validation_routes()
+        _register_viewport_routes()
 
         # Start HTTP server
         config = ServerConfig(host=HTTP_HOST, port=HTTP_PORT)
@@ -310,6 +320,13 @@ def _register_task_handlers() -> None:
     _event_manager.register_task_handler("get_body_properties", handle_get_body_properties)
     _event_manager.register_task_handler("get_sketch_status", handle_get_sketch_status)
 
+    # Viewport handlers
+    _event_manager.register_task_handler("take_screenshot", handle_take_screenshot)
+    _event_manager.register_task_handler("set_camera", handle_set_camera)
+    _event_manager.register_task_handler("get_camera", handle_get_camera)
+    _event_manager.register_task_handler("set_view", handle_set_view)
+    _event_manager.register_task_handler("fit_view", handle_fit_view)
+
 
 def _register_query_routes() -> None:
     """Register HTTP routes for query endpoints."""
@@ -423,6 +440,16 @@ def _register_validation_routes() -> None:
     # Phase 4: Property and status routes
     FusionHTTPHandler.register_route("POST", "/validate/body_properties", "get_body_properties")
     FusionHTTPHandler.register_route("POST", "/validate/sketch_status", "get_sketch_status")
+
+
+def _register_viewport_routes() -> None:
+    """Register HTTP routes for viewport endpoints."""
+    FusionHTTPHandler.register_route("POST", "/viewport/screenshot", "take_screenshot")
+    FusionHTTPHandler.register_route("POST", "/viewport/camera", "set_camera")
+    FusionHTTPHandler.register_route("GET", "/viewport/camera/get", "get_camera")
+    FusionHTTPHandler.register_route("POST", "/viewport/camera/get", "get_camera")
+    FusionHTTPHandler.register_route("POST", "/viewport/view", "set_view")
+    FusionHTTPHandler.register_route("POST", "/viewport/fit", "fit_view")
 
 
 def _show_message(message: str) -> None:

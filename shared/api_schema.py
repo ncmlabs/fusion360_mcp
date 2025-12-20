@@ -84,7 +84,13 @@ ENDPOINTS = {
     # Export
     "export_step": "/export/step",
     "export_stl": "/export/stl",
-    "take_screenshot": "/export/screenshot",
+
+    # Viewport
+    "take_screenshot": "/viewport/screenshot",
+    "set_camera": "/viewport/camera",
+    "get_camera": "/viewport/camera/get",
+    "set_view": "/viewport/view",
+    "fit_view": "/viewport/fit",
 
     # Utility
     "undo": "/utility/undo",
