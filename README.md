@@ -65,6 +65,7 @@ Environment variables (prefix with `FUSION_MCP_`):
 
 ## Documentation
 
+- [LLM Prompt Guide](PROMPT.md) - Quick reference for LLM tool selection and workflows
 - [API Reference](docs/api-reference.md) - Complete tool documentation
 - [Architecture](docs/architecture.md) - System design and data flow
 - [User Guide](docs/user-guide.md) - How to use with AI assistants
