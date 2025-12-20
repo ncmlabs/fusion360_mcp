@@ -85,6 +85,10 @@ from handlers.creation_handlers import (
     handle_create_torus,
     handle_create_coil,
     handle_create_pipe,
+    # Phase 8b: Feature Pattern Tools
+    handle_rectangular_pattern,
+    handle_circular_pattern,
+    handle_mirror_feature,
 )
 
 # Import modification handlers
@@ -276,6 +280,11 @@ def _register_task_handlers() -> None:
     _event_manager.register_task_handler("create_coil", handle_create_coil)
     _event_manager.register_task_handler("create_pipe", handle_create_pipe)
 
+    # Phase 8b: Feature pattern handlers
+    _event_manager.register_task_handler("rectangular_pattern", handle_rectangular_pattern)
+    _event_manager.register_task_handler("circular_pattern", handle_circular_pattern)
+    _event_manager.register_task_handler("mirror_feature", handle_mirror_feature)
+
     # Phase 3: Modification handlers
     _event_manager.register_task_handler("move_body", handle_move_body)
     _event_manager.register_task_handler("rotate_body", handle_rotate_body)
@@ -363,6 +372,11 @@ def _register_creation_routes() -> None:
     FusionHTTPHandler.register_route("POST", "/create/torus", "create_torus")
     FusionHTTPHandler.register_route("POST", "/create/coil", "create_coil")
     FusionHTTPHandler.register_route("POST", "/create/pipe", "create_pipe")
+
+    # Phase 8b: Feature pattern routes
+    FusionHTTPHandler.register_route("POST", "/pattern/rectangular", "rectangular_pattern")
+    FusionHTTPHandler.register_route("POST", "/pattern/circular", "circular_pattern")
+    FusionHTTPHandler.register_route("POST", "/pattern/mirror", "mirror_feature")
 
 
 def _register_modification_routes() -> None:

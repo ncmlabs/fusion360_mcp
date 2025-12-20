@@ -1263,6 +1263,465 @@ def create_pipe(
         raise FeatureError("create_pipe", f"Failed to create pipe: {str(e)}", fusion_error=str(e))
 
 
+def _get_feature(feature_id: str) -> Any:
+    """Get a feature by ID."""
+    design = _get_active_design()
+    registry = get_registry()
+
+    feature = registry.get_feature(feature_id)
+
+    if not feature:
+        # Try to find in timeline
+        timeline = design.timeline
+        for i in range(timeline.count):
+            item = timeline.item(i)
+            if hasattr(item, 'entity') and item.entity:
+                entity = item.entity
+                if hasattr(entity, 'name') and entity.name == feature_id:
+                    feature = entity
+                    registry.register_feature(feature)
+                    break
+
+    if not feature:
+        available = registry.get_available_feature_ids()
+        raise EntityNotFoundError("Feature", feature_id, available)
+
+    return feature
+
+
+def _get_axis_entity(axis: str, component: Any) -> Tuple[Any, Any]:
+    """Get axis entity and vector for patterns.
+
+    Args:
+        axis: Axis specification ("X", "Y", "Z" or edge_id)
+        component: The component to get axis from
+
+    Returns:
+        Tuple of (axis_entity, axis_vector)
+    """
+    axis_upper = axis.upper() if len(axis) <= 2 else axis
+
+    if axis_upper == "X":
+        return component.xConstructionAxis, adsk.core.Vector3D.create(1, 0, 0)
+    elif axis_upper == "Y":
+        return component.yConstructionAxis, adsk.core.Vector3D.create(0, 1, 0)
+    elif axis_upper == "Z":
+        return component.zConstructionAxis, adsk.core.Vector3D.create(0, 0, 1)
+    else:
+        # Try to get edge from registry
+        registry = get_registry()
+        edge = registry.get_sub_entity(axis)
+        if edge:
+            return edge, None
+        raise InvalidParameterError(
+            "axis", axis,
+            valid_values=["X", "Y", "Z"],
+            reason="Invalid axis. Use X, Y, Z or a valid edge ID."
+        )
+
+
+def _get_mirror_plane(mirror_plane: str, component: Any) -> Any:
+    """Get mirror plane entity.
+
+    Args:
+        mirror_plane: Plane specification ("XY", "YZ", "XZ" or plane_id)
+        component: The component to get plane from
+
+    Returns:
+        Construction plane or face entity
+    """
+    plane_upper = mirror_plane.upper() if len(mirror_plane) <= 2 else mirror_plane
+
+    if plane_upper == "XY":
+        return component.xYConstructionPlane
+    elif plane_upper == "YZ":
+        return component.yZConstructionPlane
+    elif plane_upper == "XZ":
+        return component.xZConstructionPlane
+    else:
+        # Try to get from registry
+        registry = get_registry()
+        plane = registry.get_sub_entity(mirror_plane)
+        if plane:
+            return plane
+        raise InvalidParameterError(
+            "mirror_plane", mirror_plane,
+            valid_values=["XY", "YZ", "XZ"],
+            reason="Invalid plane. Use XY, YZ, XZ or a valid plane/face ID."
+        )
+
+
+def rectangular_pattern(
+    entity_ids: List[str],
+    entity_type: str,
+    x_count: int,
+    x_spacing: float,
+    x_axis: str = "X",
+    y_count: int = 1,
+    y_spacing: float = 0.0,
+    y_axis: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Create a rectangular (linear) pattern of bodies or features.
+
+    Args:
+        entity_ids: List of body or feature IDs to pattern
+        entity_type: "bodies" or "features"
+        x_count: Number of columns (instances in X direction)
+        x_spacing: Column spacing in mm
+        x_axis: Direction for columns ("X", "Y", "Z" or edge_id)
+        y_count: Number of rows (default 1 for 1D pattern)
+        y_spacing: Row spacing in mm
+        y_axis: Direction for rows (perpendicular to x_axis if not specified)
+
+    Returns:
+        Dict with pattern feature info and created instance IDs
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If entities not found
+        FeatureError: If pattern fails
+    """
+    if entity_type not in ["bodies", "features"]:
+        raise InvalidParameterError("entity_type", entity_type, valid_values=["bodies", "features"])
+
+    if x_count < 2:
+        raise InvalidParameterError("x_count", x_count, min_value=2, reason="Must have at least 2 instances")
+
+    if x_spacing <= 0:
+        raise InvalidParameterError("x_spacing", x_spacing, min_value=0.001)
+
+    if y_count > 1 and y_spacing <= 0:
+        raise InvalidParameterError("y_spacing", y_spacing, min_value=0.001, reason="y_spacing required when y_count > 1")
+
+    if not entity_ids:
+        raise InvalidParameterError("entity_ids", entity_ids, reason="At least one entity ID required")
+
+    design = _get_active_design()
+    registry = get_registry()
+
+    try:
+        # Collect entities
+        entities = adsk.core.ObjectCollection.create()
+        component = None
+
+        for entity_id in entity_ids:
+            if entity_type == "bodies":
+                entity = _get_body(entity_id)
+                if component is None:
+                    component = entity.parentComponent
+            else:
+                entity = _get_feature(entity_id)
+                if component is None:
+                    component = entity.parentComponent if hasattr(entity, 'parentComponent') else design.rootComponent
+
+            entities.add(entity)
+
+        if component is None:
+            component = design.rootComponent
+
+        # Get axes
+        x_axis_entity, x_vector = _get_axis_entity(x_axis, component)
+
+        # Convert spacing to cm
+        x_spacing_cm = x_spacing / 10.0
+        y_spacing_cm = y_spacing / 10.0
+
+        # Create rectangular pattern
+        patterns = component.features.rectangularPatternFeatures
+        pattern_input = patterns.createInput(
+            entities,
+            x_axis_entity,
+            adsk.core.ValueInput.createByReal(x_count),
+            adsk.core.ValueInput.createByReal(x_spacing_cm),
+            adsk.fusion.PatternDistanceType.SpacingPatternDistanceType
+        )
+
+        # Set second direction if needed
+        if y_count > 1:
+            if y_axis:
+                y_axis_entity, _ = _get_axis_entity(y_axis, component)
+            else:
+                # Default to perpendicular axis
+                if x_axis.upper() == "X":
+                    y_axis_entity = component.yConstructionAxis
+                elif x_axis.upper() == "Y":
+                    y_axis_entity = component.xConstructionAxis
+                else:
+                    y_axis_entity = component.yConstructionAxis
+
+            pattern_input.setDirectionTwo(
+                y_axis_entity,
+                adsk.core.ValueInput.createByReal(y_count),
+                adsk.core.ValueInput.createByReal(y_spacing_cm)
+            )
+
+        # Create the pattern
+        pattern_feature = patterns.add(pattern_input)
+
+        if not pattern_feature:
+            raise FeatureError("rectangular_pattern", "Pattern creation failed")
+
+        # Register feature
+        feature_id = registry.register_feature(pattern_feature)
+
+        # Collect created instances
+        created_instances = []
+        if entity_type == "bodies":
+            for i in range(pattern_feature.bodies.count):
+                body = pattern_feature.bodies.item(i)
+                body_id = registry.register_body(body)
+                created_instances.append(body_id)
+        else:
+            for i in range(pattern_feature.patternElements.count):
+                created_instances.append(f"pattern_element_{i}")
+
+        total_instances = x_count * y_count
+
+        return {
+            "success": True,
+            "feature": {
+                "id": feature_id,
+                "type": "RectangularPatternFeature",
+            },
+            "pattern": {
+                "type": "rectangular",
+                "x_count": x_count,
+                "x_spacing": x_spacing,
+                "y_count": y_count,
+                "y_spacing": y_spacing,
+                "total_instances": total_instances,
+            },
+            "source_entities": entity_ids,
+            "created_instances": created_instances,
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("rectangular_pattern", f"Failed to create pattern: {str(e)}", fusion_error=str(e))
+
+
+def circular_pattern(
+    entity_ids: List[str],
+    entity_type: str,
+    axis: str,
+    count: int,
+    total_angle: float = 360.0,
+    is_symmetric: bool = True,
+) -> Dict[str, Any]:
+    """Create a circular (radial) pattern of bodies or features.
+
+    Args:
+        entity_ids: List of body or feature IDs to pattern
+        entity_type: "bodies" or "features"
+        axis: Rotation axis ("X", "Y", "Z" or axis_id)
+        count: Number of instances (including original)
+        total_angle: Total angle span in degrees (default 360)
+        is_symmetric: Distribute evenly within total_angle
+
+    Returns:
+        Dict with pattern feature info and created instance IDs
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If entities not found
+        FeatureError: If pattern fails
+    """
+    if entity_type not in ["bodies", "features"]:
+        raise InvalidParameterError("entity_type", entity_type, valid_values=["bodies", "features"])
+
+    if count < 2:
+        raise InvalidParameterError("count", count, min_value=2, reason="Must have at least 2 instances")
+
+    if total_angle <= 0 or total_angle > 360:
+        raise InvalidParameterError("total_angle", total_angle, min_value=0.001, max_value=360)
+
+    if not entity_ids:
+        raise InvalidParameterError("entity_ids", entity_ids, reason="At least one entity ID required")
+
+    design = _get_active_design()
+    registry = get_registry()
+
+    try:
+        # Collect entities
+        entities = adsk.core.ObjectCollection.create()
+        component = None
+
+        for entity_id in entity_ids:
+            if entity_type == "bodies":
+                entity = _get_body(entity_id)
+                if component is None:
+                    component = entity.parentComponent
+            else:
+                entity = _get_feature(entity_id)
+                if component is None:
+                    component = entity.parentComponent if hasattr(entity, 'parentComponent') else design.rootComponent
+
+            entities.add(entity)
+
+        if component is None:
+            component = design.rootComponent
+
+        # Get axis
+        axis_entity, _ = _get_axis_entity(axis, component)
+
+        # Convert angle to radians
+        angle_rad = math.radians(total_angle)
+
+        # Create circular pattern
+        patterns = component.features.circularPatternFeatures
+        pattern_input = patterns.createInput(entities, axis_entity)
+
+        # Set count and angle
+        pattern_input.quantity = adsk.core.ValueInput.createByReal(count)
+        pattern_input.totalAngle = adsk.core.ValueInput.createByReal(angle_rad)
+        pattern_input.isSymmetric = is_symmetric
+
+        # Create the pattern
+        pattern_feature = patterns.add(pattern_input)
+
+        if not pattern_feature:
+            raise FeatureError("circular_pattern", "Pattern creation failed")
+
+        # Register feature
+        feature_id = registry.register_feature(pattern_feature)
+
+        # Collect created instances
+        created_instances = []
+        if entity_type == "bodies":
+            for i in range(pattern_feature.bodies.count):
+                body = pattern_feature.bodies.item(i)
+                body_id = registry.register_body(body)
+                created_instances.append(body_id)
+        else:
+            for i in range(pattern_feature.patternElements.count):
+                created_instances.append(f"pattern_element_{i}")
+
+        # Calculate angle between instances
+        if is_symmetric:
+            angle_between = total_angle / count
+        else:
+            angle_between = total_angle / (count - 1) if count > 1 else 0
+
+        return {
+            "success": True,
+            "feature": {
+                "id": feature_id,
+                "type": "CircularPatternFeature",
+            },
+            "pattern": {
+                "type": "circular",
+                "axis": axis,
+                "count": count,
+                "total_angle": total_angle,
+                "angle_between": angle_between,
+                "is_symmetric": is_symmetric,
+            },
+            "source_entities": entity_ids,
+            "created_instances": created_instances,
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("circular_pattern", f"Failed to create pattern: {str(e)}", fusion_error=str(e))
+
+
+def mirror_feature(
+    entity_ids: List[str],
+    entity_type: str,
+    mirror_plane: str,
+) -> Dict[str, Any]:
+    """Mirror bodies or features across a plane.
+
+    Args:
+        entity_ids: List of body or feature IDs to mirror
+        entity_type: "bodies" or "features"
+        mirror_plane: Mirror plane ("XY", "YZ", "XZ" or plane_id)
+
+    Returns:
+        Dict with mirror feature info and created instance IDs
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If entities not found
+        FeatureError: If mirror fails
+    """
+    if entity_type not in ["bodies", "features"]:
+        raise InvalidParameterError("entity_type", entity_type, valid_values=["bodies", "features"])
+
+    if not entity_ids:
+        raise InvalidParameterError("entity_ids", entity_ids, reason="At least one entity ID required")
+
+    design = _get_active_design()
+    registry = get_registry()
+
+    try:
+        # Collect entities
+        entities = adsk.core.ObjectCollection.create()
+        component = None
+
+        for entity_id in entity_ids:
+            if entity_type == "bodies":
+                entity = _get_body(entity_id)
+                if component is None:
+                    component = entity.parentComponent
+            else:
+                entity = _get_feature(entity_id)
+                if component is None:
+                    component = entity.parentComponent if hasattr(entity, 'parentComponent') else design.rootComponent
+
+            entities.add(entity)
+
+        if component is None:
+            component = design.rootComponent
+
+        # Get mirror plane
+        plane = _get_mirror_plane(mirror_plane, component)
+
+        # Create mirror feature
+        mirrors = component.features.mirrorFeatures
+        mirror_input = mirrors.createInput(entities, plane)
+
+        # Create the mirror
+        mirror_feature_obj = mirrors.add(mirror_input)
+
+        if not mirror_feature_obj:
+            raise FeatureError("mirror_feature", "Mirror operation failed")
+
+        # Register feature
+        feature_id = registry.register_feature(mirror_feature_obj)
+
+        # Collect created instances
+        created_instances = []
+        if entity_type == "bodies":
+            for i in range(mirror_feature_obj.bodies.count):
+                body = mirror_feature_obj.bodies.item(i)
+                body_id = registry.register_body(body)
+                created_instances.append(body_id)
+        else:
+            # For features, the mirror creates new elements
+            created_instances.append(f"mirror_{feature_id}")
+
+        return {
+            "success": True,
+            "feature": {
+                "id": feature_id,
+                "type": "MirrorFeature",
+            },
+            "mirror": {
+                "plane": mirror_plane,
+            },
+            "source_entities": entity_ids,
+            "created_instances": created_instances,
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("mirror_feature", f"Failed to mirror: {str(e)}", fusion_error=str(e))
+
+
 def create_hole(
     body_id: Optional[str] = None,
     face_id: Optional[str] = None,

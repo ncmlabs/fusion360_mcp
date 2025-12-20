@@ -2442,4 +2442,268 @@ def register_creation_tools(mcp: FastMCP) -> None:
                 name=name,
             )
 
+    # --- Phase 8b: Feature Pattern Tools ---
+
+    @mcp.tool()
+    async def rectangular_pattern(
+        entity_ids: List[str],
+        entity_type: str,
+        x_count: int,
+        x_spacing: float,
+        x_axis: str = "X",
+        y_count: int = 1,
+        y_spacing: float = 0.0,
+        y_axis: Optional[str] = None,
+    ) -> dict:
+        """Create a rectangular (linear) pattern of bodies or features.
+
+        Creates copies of existing bodies or features arranged in a rectangular
+        grid pattern. Perfect for mounting hole patterns, ventilation grids,
+        linear arrays of components, and any repeated geometry.
+
+        **All dimensions in millimeters (mm).**
+
+        Args:
+            entity_ids: List of body IDs or feature IDs to pattern.
+                       Get body IDs from create_box, create_cylinder, etc.
+                       Get feature IDs from extrude, fillet, chamfer, etc.
+            entity_type: Type of entities being patterned:
+                        - "bodies": Pattern solid bodies
+                        - "features": Pattern timeline features
+            x_count: Number of columns (instances in first direction).
+                    Must be at least 2.
+            x_spacing: Spacing between columns in mm. Must be positive.
+            x_axis: Direction for first pattern axis.
+                   - "X": Along X axis (default)
+                   - "Y": Along Y axis
+                   - "Z": Along Z axis
+                   Or provide an edge_id for custom direction.
+            y_count: Number of rows (instances in second direction).
+                    Default 1 for linear (1D) patterns.
+            y_spacing: Spacing between rows in mm. Required if y_count > 1.
+            y_axis: Direction for second pattern axis. If not specified,
+                   defaults to perpendicular to x_axis.
+
+        Returns:
+            Dict containing:
+            - success: True if pattern was created
+            - feature: Pattern feature info with id and type
+            - pattern: Pattern details with x_count, x_spacing, y_count,
+              y_spacing, total_instances
+            - source_entities: Original entity IDs that were patterned
+            - created_instances: IDs of new pattern instances
+
+        Example:
+            # Create a 4x3 grid of mounting holes
+            # First create a single hole
+            box = await create_box(width=100, depth=80, height=10)
+            body_id = box["body"]["id"]
+
+            # Create hole at first position
+            await create_hole(body_id=body_id, diameter=5, depth=10, x=-35, y=-25)
+
+            # Pattern the hole in a 4x3 grid
+            result = await rectangular_pattern(
+                entity_ids=[body_id],
+                entity_type="bodies",
+                x_count=4,
+                x_spacing=25,
+                y_count=3,
+                y_spacing=20
+            )
+            # Creates 12 total instances (4 columns x 3 rows)
+
+            # Create a linear 1D pattern (single row)
+            result = await rectangular_pattern(
+                entity_ids=["body_0"],
+                entity_type="bodies",
+                x_count=5,
+                x_spacing=20
+            )
+            # Creates 5 instances in a row
+        """
+        logger.info(
+            "rectangular_pattern called",
+            entity_count=len(entity_ids),
+            entity_type=entity_type,
+            x_count=x_count,
+            x_spacing=x_spacing,
+            y_count=y_count,
+            y_spacing=y_spacing,
+        )
+        async with FusionClient() as client:
+            return await client.rectangular_pattern(
+                entity_ids=entity_ids,
+                entity_type=entity_type,
+                x_count=x_count,
+                x_spacing=x_spacing,
+                x_axis=x_axis,
+                y_count=y_count,
+                y_spacing=y_spacing,
+                y_axis=y_axis,
+            )
+
+    @mcp.tool()
+    async def circular_pattern(
+        entity_ids: List[str],
+        entity_type: str,
+        axis: str,
+        count: int,
+        total_angle: float = 360.0,
+        is_symmetric: bool = True,
+    ) -> dict:
+        """Create a circular (radial) pattern of bodies or features.
+
+        Creates copies of existing bodies or features arranged in a circular
+        pattern around an axis. Perfect for bolt hole patterns, gear teeth,
+        turbine blades, wheel spokes, and any radially symmetric geometry.
+
+        **Angles in degrees.**
+
+        Args:
+            entity_ids: List of body IDs or feature IDs to pattern.
+            entity_type: Type of entities being patterned:
+                        - "bodies": Pattern solid bodies
+                        - "features": Pattern timeline features
+            axis: Rotation axis for the pattern:
+                 - "X": Around X axis
+                 - "Y": Around Y axis
+                 - "Z": Around Z axis (most common for horizontal patterns)
+                 Or provide an axis_id for custom rotation axis.
+            count: Total number of instances (including the original).
+                  Must be at least 2.
+            total_angle: Total angle span in degrees (default 360 for full circle).
+                        Use smaller values for partial patterns (e.g., 180 for
+                        half circle, 90 for quarter circle).
+            is_symmetric: If True, distribute instances evenly within total_angle.
+                         If False, angle is measured between adjacent instances.
+                         Default True.
+
+        Returns:
+            Dict containing:
+            - success: True if pattern was created
+            - feature: Pattern feature info with id and type
+            - pattern: Pattern details with axis, count, total_angle,
+              angle_between, is_symmetric
+            - source_entities: Original entity IDs that were patterned
+            - created_instances: IDs of new pattern instances
+
+        Example:
+            # Create a 6-bolt flange pattern
+            # First create a base plate with one mounting hole
+            plate = await create_cylinder(radius=50, height=10)
+            plate_id = plate["body"]["id"]
+
+            # Create mounting hole at radius 35mm
+            await create_hole(body_id=plate_id, diameter=8, depth=10, x=35, y=0)
+
+            # Pattern the hole around Z axis (6 holes, 60° apart)
+            result = await circular_pattern(
+                entity_ids=[plate_id],
+                entity_type="bodies",
+                axis="Z",
+                count=6
+            )
+            # Creates 6 evenly spaced holes at 0°, 60°, 120°, 180°, 240°, 300°
+
+            # Create a partial pattern (quarter arc)
+            result = await circular_pattern(
+                entity_ids=["body_0"],
+                entity_type="bodies",
+                axis="Z",
+                count=4,
+                total_angle=90
+            )
+            # Creates 4 instances within 90° arc
+        """
+        logger.info(
+            "circular_pattern called",
+            entity_count=len(entity_ids),
+            entity_type=entity_type,
+            axis=axis,
+            count=count,
+            total_angle=total_angle,
+            is_symmetric=is_symmetric,
+        )
+        async with FusionClient() as client:
+            return await client.circular_pattern(
+                entity_ids=entity_ids,
+                entity_type=entity_type,
+                axis=axis,
+                count=count,
+                total_angle=total_angle,
+                is_symmetric=is_symmetric,
+            )
+
+    @mcp.tool()
+    async def mirror_feature(
+        entity_ids: List[str],
+        entity_type: str,
+        mirror_plane: str,
+    ) -> dict:
+        """Mirror bodies or features across a plane.
+
+        Creates a mirrored copy of existing bodies or features across a
+        symmetry plane. Essential for creating symmetric designs efficiently -
+        design one half, then mirror to create the other half.
+
+        Args:
+            entity_ids: List of body IDs or feature IDs to mirror.
+            entity_type: Type of entities being mirrored:
+                        - "bodies": Mirror solid bodies
+                        - "features": Mirror timeline features
+            mirror_plane: The symmetry plane for mirroring:
+                         - "XY": Mirror across the XY plane (Z=0)
+                         - "YZ": Mirror across the YZ plane (X=0)
+                         - "XZ": Mirror across the XZ plane (Y=0)
+                         Or provide a plane_id or face_id for custom plane.
+
+        Returns:
+            Dict containing:
+            - success: True if mirror was created
+            - feature: Mirror feature info with id and type
+            - mirror: Mirror details with plane used
+            - source_entities: Original entity IDs that were mirrored
+            - created_instances: IDs of new mirrored instances
+
+        Example:
+            # Design one half of a symmetric bracket, then mirror it
+            # Create left half of bracket
+            left_half = await create_box(width=50, depth=30, height=20, x=-25)
+            left_id = left_half["body"]["id"]
+
+            # Add features to left half
+            await fillet(body_id=left_id, edge_ids=["..."], radius=2)
+
+            # Mirror to create right half
+            result = await mirror_feature(
+                entity_ids=[left_id],
+                entity_type="bodies",
+                mirror_plane="YZ"  # Mirror across YZ plane (X=0)
+            )
+            # Creates a complete symmetric bracket
+
+            # Mirror a feature instead of a body
+            extrusion = await extrude(sketch_id="...", distance=10)
+            feature_id = extrusion["feature"]["id"]
+
+            result = await mirror_feature(
+                entity_ids=[feature_id],
+                entity_type="features",
+                mirror_plane="XZ"  # Mirror across XZ plane (Y=0)
+            )
+        """
+        logger.info(
+            "mirror_feature called",
+            entity_count=len(entity_ids),
+            entity_type=entity_type,
+            mirror_plane=mirror_plane,
+        )
+        async with FusionClient() as client:
+            return await client.mirror_feature(
+                entity_ids=entity_ids,
+                entity_type=entity_type,
+                mirror_plane=mirror_plane,
+            )
+
     logger.info("Creation tools registered")
