@@ -11,6 +11,7 @@ from .tools import (
     register_modification_tools,
     register_validation_tools,
     register_system_tools,
+    register_viewport_tools,
 )
 
 
@@ -49,6 +50,13 @@ VALIDATION WORKFLOW:
 4. Use get_body_properties() for volume, area, center of mass, and dimensions
 5. Use get_sketch_status() to check if a sketch is fully constrained
 
+VIEWPORT WORKFLOW:
+1. Use take_screenshot() to capture the current view as PNG (base64 or file)
+2. Use set_view() to switch to standard views (front, top, isometric, etc.)
+3. Use set_camera() for precise camera positioning
+4. Use fit_view() to zoom to fit all geometry or specific entities
+5. Use get_camera() to query the current camera state
+
 IMPORTANT:
 - All dimensions are in millimeters (mm)
 - Always query the design state before making changes
@@ -58,6 +66,7 @@ IMPORTANT:
 - For fillet/chamfer, get edge IDs using get_body_by_id with include_edges=True
 - move_body and rotate_body use parametric operations that preserve design history
 - Use update_parameter to change dimensions via expressions like "50 mm" or "d1 * 2"
+- Use take_screenshot() to visualize the design at any point in the workflow
 """,
 )
 
@@ -111,6 +120,9 @@ def main() -> None:
 
     register_system_tools(mcp)
     logger.info("System tools registered")
+
+    register_viewport_tools(mcp)
+    logger.info("Viewport tools registered")
 
     # Determine transport
     transport = args.transport or config.server_transport

@@ -1944,3 +1944,127 @@ class FusionClient:
             "profile_index": profile_index,
             "taper_angle": taper_angle,
         })
+
+    # --- Viewport Methods ---
+
+    async def take_screenshot(
+        self,
+        file_path: Optional[str] = None,
+        view: str = "current",
+        width: int = 1920,
+        height: int = 1080,
+        return_base64: bool = True,
+    ) -> Dict[str, Any]:
+        """Capture the viewport as a PNG image.
+
+        Args:
+            file_path: Optional path to save the image
+            view: View to capture ("current" or standard view name)
+            width: Image width in pixels
+            height: Image height in pixels
+            return_base64: Return base64-encoded image data
+
+        Returns:
+            Dict with image data and metadata
+        """
+        data: Dict[str, Any] = {
+            "view": view,
+            "width": width,
+            "height": height,
+            "return_base64": return_base64,
+        }
+        if file_path is not None:
+            data["file_path"] = file_path
+        return await self._request("POST", "/viewport/screenshot", data)
+
+    async def set_camera(
+        self,
+        eye_x: float,
+        eye_y: float,
+        eye_z: float,
+        target_x: float = 0.0,
+        target_y: float = 0.0,
+        target_z: float = 0.0,
+        up_x: float = 0.0,
+        up_y: float = 0.0,
+        up_z: float = 1.0,
+        smooth_transition: bool = True,
+    ) -> Dict[str, Any]:
+        """Set the viewport camera position and orientation.
+
+        Args:
+            eye_x: Camera eye X position in mm
+            eye_y: Camera eye Y position in mm
+            eye_z: Camera eye Z position in mm
+            target_x: Camera target X position in mm
+            target_y: Camera target Y position in mm
+            target_z: Camera target Z position in mm
+            up_x: Up vector X component
+            up_y: Up vector Y component
+            up_z: Up vector Z component
+            smooth_transition: Animate the transition
+
+        Returns:
+            Dict with camera state after change
+        """
+        return await self._request("POST", "/viewport/camera", {
+            "eye_x": eye_x,
+            "eye_y": eye_y,
+            "eye_z": eye_z,
+            "target_x": target_x,
+            "target_y": target_y,
+            "target_z": target_z,
+            "up_x": up_x,
+            "up_y": up_y,
+            "up_z": up_z,
+            "smooth_transition": smooth_transition,
+        })
+
+    async def get_camera(self) -> Dict[str, Any]:
+        """Get the current viewport camera state.
+
+        Returns:
+            Dict with camera position, orientation, and settings
+        """
+        return await self._request("GET", "/viewport/camera/get")
+
+    async def set_view(
+        self,
+        view: str,
+        smooth_transition: bool = True,
+    ) -> Dict[str, Any]:
+        """Set the viewport to a standard named view.
+
+        Args:
+            view: Named view (front, back, top, bottom, left, right,
+                  isometric, trimetric, home)
+            smooth_transition: Animate the view change
+
+        Returns:
+            Dict with view name and camera state
+        """
+        return await self._request("POST", "/viewport/view", {
+            "view": view,
+            "smooth_transition": smooth_transition,
+        })
+
+    async def fit_view(
+        self,
+        entity_ids: Optional[List[str]] = None,
+        smooth_transition: bool = True,
+    ) -> Dict[str, Any]:
+        """Fit the viewport to show specific entities or all geometry.
+
+        Args:
+            entity_ids: Optional list of entity IDs to fit to
+            smooth_transition: Animate the zoom change
+
+        Returns:
+            Dict with fitted_to and camera state
+        """
+        data: Dict[str, Any] = {
+            "smooth_transition": smooth_transition,
+        }
+        if entity_ids is not None:
+            data["entity_ids"] = entity_ids
+        return await self._request("POST", "/viewport/fit", data)
