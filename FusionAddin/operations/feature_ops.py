@@ -2215,9 +2215,6 @@ def emboss(
 ) -> Dict[str, Any]:
     """Create raised (emboss) or recessed (deboss) features from sketch profiles.
 
-    NOTE: The Fusion 360 EmbossFeatures API is in preview status and has limited
-    programmatic support. Use the alternative workflow described below.
-
     Args:
         sketch_id: ID of the sketch containing profile/text to emboss
         face_id: ID of the face to emboss onto
@@ -2234,25 +2231,108 @@ def emboss(
         EntityNotFoundError: If sketch or face not found
         FeatureError: If emboss fails
     """
-    # The EmbossFeatures API is in preview status and doesn't support
-    # programmatic creation reliably. Provide a detailed workaround.
-    workaround = (
-        "The Fusion 360 Emboss API is currently in preview and does not support "
-        "programmatic feature creation. Use this alternative workflow instead:\n\n"
-        "For RAISED features (emboss):\n"
-        "1. Create a sketch on an offset plane at the target face height\n"
-        "2. Draw your geometry (shapes work; for text, use Fusion 360 UI to 'Explode Text' first)\n"
-        "3. Use extrude() with operation='join' and target the body\n\n"
-        "For ENGRAVED features (deboss):\n"
-        "1. Create a sketch on the target face\n"
-        "2. Draw your geometry (shapes work; for text, explode in UI first)\n"
-        "3. Use extrude() with operation='cut' and direction='negative'\n\n"
-        "Note: add_sketch_text() creates SketchText entities which may not create "
-        "extrudable profiles directly. For text embossing, create text in Fusion 360 "
-        "UI and use 'Explode Text' to convert to curves, then use extrude."
-    )
-    raise FeatureError(
-        "emboss",
-        workaround,
-        suggestion="Use extrude() with operation='join' (for raised) or 'cut' (for engraved)"
-    )
+    if depth <= 0:
+        raise InvalidParameterError("depth", depth, min_value=0.001)
+    if taper_angle < 0 or taper_angle >= 90:
+        raise InvalidParameterError("taper_angle", taper_angle, min_value=0, max_value=89.999)
+
+    design = _get_active_design()
+    registry = get_registry()
+
+    try:
+        # Get sketch
+        sketch = registry.get_sketch(sketch_id)
+        if not sketch:
+            raise EntityNotFoundError("sketch", sketch_id)
+
+        # Check for profiles
+        if sketch.profiles.count == 0:
+            raise FeatureError(
+                "emboss",
+                f"Sketch '{sketch_id}' has no closed profiles. "
+                "Emboss requires closed profile geometry.",
+                suggestion="Draw closed shapes (circles, rectangles) or ensure curves form closed loops"
+            )
+
+        if profile_index >= sketch.profiles.count:
+            raise InvalidParameterError(
+                "profile_index",
+                profile_index,
+                max_value=sketch.profiles.count - 1
+            )
+
+        profile = sketch.profiles.item(profile_index)
+
+        # Get target face
+        face = registry.get_sub_entity(face_id)
+        if not face:
+            raise EntityNotFoundError("face", face_id, suggestion="Use get_body_by_id with include_faces=True")
+
+        # Get the component containing the face
+        body = face.body
+        component = body.parentComponent
+
+        # Convert depth to cm
+        depth_cm = depth / 10.0
+        taper_rad = math.radians(taper_angle)
+
+        # Try to use the EmbossFeatures API
+        emboss_features = component.features.embossFeatures
+
+        # Check if createInput method exists
+        if not hasattr(emboss_features, 'createInput'):
+            raise FeatureError(
+                "emboss",
+                "The EmbossFeatures.createInput() method is not available in this Fusion 360 version. "
+                "Use extrude() with operation='join' or 'cut' as an alternative.",
+                suggestion="Use extrude() with operation='join' (for raised) or 'cut' (for engraved)"
+            )
+
+        # Create arrays for profiles and faces (API requires arrays)
+        profiles_array = [profile]
+        faces_array = [face]
+
+        # Depth: positive for emboss (raised), negative for deboss (engraved)
+        actual_depth = depth_cm if is_emboss else -depth_cm
+        depth_value = adsk.core.ValueInput.createByReal(actual_depth)
+
+        # Create emboss input with profiles, faces, and depth
+        emboss_input = emboss_features.createInput(profiles_array, faces_array, depth_value)
+
+        # Create the emboss feature
+        emboss_feature = emboss_features.add(emboss_input)
+
+        if not emboss_feature:
+            raise FeatureError("emboss", "Failed to create emboss feature")
+
+        # Register feature
+        feature_id = registry.register_feature(emboss_feature)
+
+        return {
+            "success": True,
+            "feature": {
+                "id": feature_id,
+                "name": emboss_feature.name,
+                "type": "emboss" if is_emboss else "deboss",
+            },
+            "emboss": {
+                "type": "emboss" if is_emboss else "deboss",
+                "depth": depth,
+                "taper_angle": taper_angle,
+                "sketch_id": sketch_id,
+                "face_id": face_id,
+            },
+            "body_id": body.name if body else None,
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        # Provide helpful error with workaround
+        workaround = (
+            f"Emboss API error: {str(e)}\n\n"
+            "Alternative workflow:\n"
+            "For RAISED features: Use extrude() with operation='join'\n"
+            "For ENGRAVED features: Use extrude() with operation='cut' and direction='negative'"
+        )
+        raise FeatureError("emboss", workaround, fusion_error=str(e))
