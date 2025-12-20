@@ -12,6 +12,7 @@ from .tools import (
     register_validation_tools,
     register_system_tools,
     register_viewport_tools,
+    register_assembly_tools,
 )
 
 
@@ -56,6 +57,15 @@ VIEWPORT WORKFLOW:
 3. Use set_camera() for precise camera positioning
 4. Use fit_view() to zoom to fit all geometry or specific entities
 5. Use get_camera() to query the current camera state
+
+ASSEMBLY WORKFLOW:
+1. Create components with create_component() to organize related geometry
+2. Activate a component with activate_component() before adding geometry to it
+3. Query components with get_components() and get_component_by_id()
+4. Position component instances with move_occurrence()
+5. Connect components with create_joint() or create_joint_between_occurrences()
+6. Query joints with get_joints() and get_joint_by_id()
+7. Joint types: rigid, revolute, slider, cylindrical, pin_slot, planar, ball
 
 IMPORTANT:
 - All dimensions are in millimeters (mm)
@@ -123,6 +133,9 @@ def main() -> None:
 
     register_viewport_tools(mcp)
     logger.info("Viewport tools registered")
+
+    register_assembly_tools(mcp)
+    logger.info("Assembly tools registered")
 
     # Determine transport
     transport = args.transport or config.server_transport

@@ -78,8 +78,16 @@ ENDPOINTS = {
 
     # Assembly endpoints (Phase 5)
     "create_component": "/assembly/create_component",
-    "create_joint": "/assembly/create_joint",
+    "get_components": "/assembly/components",
+    "get_component_by_id": "/assembly/component",
+    "activate_component": "/assembly/activate_component",
+    "get_component_bodies": "/assembly/component_bodies",
+    "get_occurrences": "/assembly/occurrences",
     "move_occurrence": "/assembly/move_occurrence",
+    "create_joint": "/assembly/create_joint",
+    "create_joint_occurrences": "/assembly/create_joint_occurrences",
+    "get_joints": "/assembly/joints",
+    "get_joint_by_id": "/assembly/joint",
 
     # Export
     "export_step": "/export/step",

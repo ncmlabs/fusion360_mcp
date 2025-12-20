@@ -39,6 +39,19 @@ from .validation_ops import (
     get_body_properties,
     get_sketch_status,
 )
+from .assembly_ops import (
+    create_component,
+    get_components,
+    get_component_by_id,
+    activate_component,
+    get_occurrences,
+    move_occurrence,
+    create_joint,
+    create_joint_between_occurrences,
+    get_joints,
+    get_joint_by_id,
+    get_component_bodies,
+)
 
 __all__ = [
     # Body operations
@@ -70,4 +83,16 @@ __all__ = [
     "check_interference",
     "get_body_properties",
     "get_sketch_status",
+    # Assembly operations
+    "create_component",
+    "get_components",
+    "get_component_by_id",
+    "activate_component",
+    "get_occurrences",
+    "move_occurrence",
+    "create_joint",
+    "create_joint_between_occurrences",
+    "get_joints",
+    "get_joint_by_id",
+    "get_component_bodies",
 ]

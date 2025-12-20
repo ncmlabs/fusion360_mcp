@@ -31,6 +31,8 @@ class EntityRegistry:
         self._components: Dict[str, FusionEntity] = {}
         self._parameters: Dict[str, FusionEntity] = {}
         self._construction_planes: Dict[str, FusionEntity] = {}
+        self._occurrences: Dict[str, FusionEntity] = {}
+        self._joints: Dict[str, FusionEntity] = {}
 
         # Sub-entities (faces, edges, vertices) use composite IDs
         # Format: "{parent_id}_{type}_{index}"
@@ -43,6 +45,8 @@ class EntityRegistry:
             "feature": 0,
             "component": 0,
             "construction_plane": 0,
+            "occurrence": 0,
+            "joint": 0,
         }
 
     # --- Body Registration ---
@@ -240,6 +244,66 @@ class EntityRegistry:
         with self._lock:
             return list(self._construction_planes.keys())
 
+    # --- Occurrence Registration ---
+
+    def register_occurrence(self, occurrence: FusionEntity) -> str:
+        """Register an occurrence and return its stable ID.
+
+        Args:
+            occurrence: Fusion 360 Occurrence object
+
+        Returns:
+            Stable ID for the occurrence
+        """
+        with self._lock:
+            for occ_id, existing in self._occurrences.items():
+                if existing is occurrence:
+                    return occ_id
+
+            occ_id = self._generate_id(occurrence, "occurrence")
+            self._occurrences[occ_id] = occurrence
+            return occ_id
+
+    def get_occurrence(self, occ_id: str) -> Optional[FusionEntity]:
+        """Get an occurrence by its ID."""
+        with self._lock:
+            return self._occurrences.get(occ_id)
+
+    def get_available_occurrence_ids(self) -> List[str]:
+        """Get list of all registered occurrence IDs."""
+        with self._lock:
+            return list(self._occurrences.keys())
+
+    # --- Joint Registration ---
+
+    def register_joint(self, joint: FusionEntity) -> str:
+        """Register a joint and return its stable ID.
+
+        Args:
+            joint: Fusion 360 Joint object
+
+        Returns:
+            Stable ID for the joint
+        """
+        with self._lock:
+            for joint_id, existing in self._joints.items():
+                if existing is joint:
+                    return joint_id
+
+            joint_id = self._generate_id(joint, "joint")
+            self._joints[joint_id] = joint
+            return joint_id
+
+    def get_joint(self, joint_id: str) -> Optional[FusionEntity]:
+        """Get a joint by its ID."""
+        with self._lock:
+            return self._joints.get(joint_id)
+
+    def get_available_joint_ids(self) -> List[str]:
+        """Get list of all registered joint IDs."""
+        with self._lock:
+            return list(self._joints.keys())
+
     # --- Sub-Entity Registration (Faces, Edges, Vertices) ---
 
     def register_sub_entity(
@@ -297,6 +361,10 @@ class EntityRegistry:
                 return self._parameters[entity_id]
             if entity_id in self._construction_planes:
                 return self._construction_planes[entity_id]
+            if entity_id in self._occurrences:
+                return self._occurrences[entity_id]
+            if entity_id in self._joints:
+                return self._joints[entity_id]
             if entity_id in self._sub_entities:
                 return self._sub_entities[entity_id]
             return None
@@ -315,6 +383,8 @@ class EntityRegistry:
             self._components.clear()
             self._parameters.clear()
             self._construction_planes.clear()
+            self._occurrences.clear()
+            self._joints.clear()
             self._sub_entities.clear()
 
             # Reset counters
@@ -387,6 +457,8 @@ class EntityRegistry:
             "component": self._components,
             "parameter": self._parameters,
             "construction_plane": self._construction_planes,
+            "occurrence": self._occurrences,
+            "joint": self._joints,
         }
         return registries.get(entity_type, {})
 
@@ -424,13 +496,20 @@ class EntityRegistry:
                     for feature in feature_collection:
                         self.register_feature(feature)
 
-        # Recursively register child components (occurrences)
+        # Register occurrences and recursively register child components
         occurrences = getattr(component, 'occurrences', None)
         if occurrences:
             for occurrence in occurrences:
+                self.register_occurrence(occurrence)
                 child_component = getattr(occurrence, 'component', None)
                 if child_component:
                     self._register_component_contents(child_component)
+
+        # Register joints
+        joints = getattr(component, 'joints', None)
+        if joints:
+            for joint in joints:
+                self.register_joint(joint)
 
 
 # --- Module-level Singleton ---

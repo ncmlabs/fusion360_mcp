@@ -46,6 +46,20 @@ from .validation_handlers import (
     handle_get_sketch_status,
 )
 
+from .assembly_handlers import (
+    handle_create_component,
+    handle_get_components,
+    handle_get_component_by_id,
+    handle_activate_component,
+    handle_get_component_bodies,
+    handle_get_occurrences,
+    handle_move_occurrence,
+    handle_create_joint,
+    handle_create_joint_between_occurrences,
+    handle_get_joints,
+    handle_get_joint_by_id,
+)
+
 __all__ = [
     # Query handlers
     "handle_get_design_state",
@@ -84,4 +98,16 @@ __all__ = [
     "handle_check_interference",
     "handle_get_body_properties",
     "handle_get_sketch_status",
+    # Assembly handlers
+    "handle_create_component",
+    "handle_get_components",
+    "handle_get_component_by_id",
+    "handle_activate_component",
+    "handle_get_component_bodies",
+    "handle_get_occurrences",
+    "handle_move_occurrence",
+    "handle_create_joint",
+    "handle_create_joint_between_occurrences",
+    "handle_get_joints",
+    "handle_get_joint_by_id",
 ]

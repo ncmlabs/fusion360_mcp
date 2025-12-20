@@ -2188,3 +2188,185 @@ class FusionClient:
         if component_id is not None:
             data["component_id"] = component_id
         return await self._request("POST", "/create/plane/midplane", data)
+
+    # --- Assembly Methods ---
+
+    async def create_component(
+        self,
+        name: str,
+    ) -> Dict[str, Any]:
+        """Create a new component.
+
+        Args:
+            name: Name for the new component
+
+        Returns:
+            Dict with component and occurrence info
+        """
+        return await self._request("POST", "/assembly/create_component", {
+            "name": name,
+        })
+
+    async def get_components(self) -> Dict[str, Any]:
+        """Get all components in the design.
+
+        Returns:
+            Dict with list of component summaries
+        """
+        return await self._request("GET", "/assembly/components")
+
+    async def get_component_by_id(
+        self,
+        component_id: str,
+    ) -> Dict[str, Any]:
+        """Get detailed component info by ID.
+
+        Args:
+            component_id: Component ID to retrieve
+
+        Returns:
+            Dict with full component info
+        """
+        return await self._request("POST", "/assembly/component", {
+            "component_id": component_id,
+        })
+
+    async def activate_component(
+        self,
+        component_id: str,
+    ) -> Dict[str, Any]:
+        """Activate a component for editing.
+
+        Args:
+            component_id: Component ID to activate
+
+        Returns:
+            Dict confirming activation
+        """
+        return await self._request("POST", "/assembly/activate_component", {
+            "component_id": component_id,
+        })
+
+    async def get_component_bodies(
+        self,
+        component_id: str,
+    ) -> Dict[str, Any]:
+        """Get all bodies within a specific component.
+
+        Args:
+            component_id: Component ID to get bodies from
+
+        Returns:
+            Dict with list of body summaries
+        """
+        return await self._request("POST", "/assembly/component_bodies", {
+            "component_id": component_id,
+        })
+
+    async def get_occurrences(
+        self,
+        component_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Get all occurrences in the design or within a component.
+
+        Args:
+            component_id: Optional component ID to filter occurrences
+
+        Returns:
+            Dict with list of occurrence info
+        """
+        data = {"component_id": component_id} if component_id else {}
+        return await self._request("POST", "/assembly/occurrences", data)
+
+    async def move_occurrence(
+        self,
+        occurrence_id: str,
+        x: float = 0.0,
+        y: float = 0.0,
+        z: float = 0.0,
+    ) -> Dict[str, Any]:
+        """Move an occurrence by translation.
+
+        Args:
+            occurrence_id: Occurrence ID to move
+            x: X translation in mm
+            y: Y translation in mm
+            z: Z translation in mm
+
+        Returns:
+            Dict with updated occurrence info
+        """
+        return await self._request("POST", "/assembly/move_occurrence", {
+            "occurrence_id": occurrence_id,
+            "x": x,
+            "y": y,
+            "z": z,
+        })
+
+    async def create_joint(
+        self,
+        geometry1_id: str,
+        geometry2_id: str,
+        joint_type: str = "rigid",
+    ) -> Dict[str, Any]:
+        """Create a joint between two geometry entities.
+
+        Args:
+            geometry1_id: First geometry entity ID
+            geometry2_id: Second geometry entity ID
+            joint_type: Type of joint (rigid, revolute, slider, etc.)
+
+        Returns:
+            Dict with joint info
+        """
+        return await self._request("POST", "/assembly/create_joint", {
+            "geometry1_id": geometry1_id,
+            "geometry2_id": geometry2_id,
+            "joint_type": joint_type,
+        })
+
+    async def create_joint_between_occurrences(
+        self,
+        occurrence1_id: str,
+        occurrence2_id: str,
+        joint_type: str = "rigid",
+    ) -> Dict[str, Any]:
+        """Create a joint between two occurrences.
+
+        Args:
+            occurrence1_id: First occurrence ID
+            occurrence2_id: Second occurrence ID
+            joint_type: Type of joint (rigid, revolute, slider, etc.)
+
+        Returns:
+            Dict with joint info
+        """
+        return await self._request("POST", "/assembly/create_joint_occurrences", {
+            "occurrence1_id": occurrence1_id,
+            "occurrence2_id": occurrence2_id,
+            "joint_type": joint_type,
+        })
+
+    async def get_joints(self) -> Dict[str, Any]:
+        """Get all joints in the design.
+
+        Returns:
+            Dict with list of joint info
+        """
+        return await self._request("GET", "/assembly/joints")
+
+    async def get_joint_by_id(
+        self,
+        joint_id: str,
+    ) -> Dict[str, Any]:
+        """Get detailed joint info by ID.
+
+        Args:
+            joint_id: Joint ID to retrieve
+
+        Returns:
+            Dict with joint info
+        """
+        return await self._request("POST", "/assembly/joint", {
+            "joint_id": joint_id,
+        })
