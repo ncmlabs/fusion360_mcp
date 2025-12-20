@@ -2351,7 +2351,7 @@ def emboss(
 
 # Map combine operation names to Fusion operation types
 COMBINE_OPERATION_MAP = {
-    "join": adsk.fusion.BooleanTypes.JoinBooleanType if FUSION_AVAILABLE else 0,
+    "join": adsk.fusion.BooleanTypes.UnionBooleanType if FUSION_AVAILABLE else 0,
     "cut": adsk.fusion.BooleanTypes.CutBooleanType if FUSION_AVAILABLE else 1,
     "intersect": adsk.fusion.BooleanTypes.IntersectBooleanType if FUSION_AVAILABLE else 2,
 }
