@@ -6,6 +6,7 @@ Provides JSON logging with correlation IDs for request tracing.
 import structlog
 import uuid
 import logging
+import sys
 from contextvars import ContextVar
 from typing import Optional, Any, Dict
 from .config import get_config
@@ -85,6 +86,7 @@ def setup_logging() -> None:
     logging.basicConfig(
         format="%(message)s",
         level=log_level,
+        stream=sys.stderr,  # Explicit: stdio MCP uses stdout for JSON-RPC
     )
 
 

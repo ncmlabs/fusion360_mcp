@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "fusion360": {
+      "command": "/Users/claudiu/Work/ncmlabs/fusion360_mcp/Server/.venv/bin/python",
+      "args": [
+        "-m", "fusion360_mcp_server.main",
+        "--transport", "stdio"
+      ]
+    }
+  }
+}
