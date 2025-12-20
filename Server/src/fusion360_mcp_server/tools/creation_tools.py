@@ -1998,4 +1998,448 @@ def register_creation_tools(mcp: FastMCP) -> None:
                 text_position_y=text_position_y,
             )
 
+    # --- Phase 8a: Advanced Feature Tools ---
+
+    @mcp.tool()
+    async def sweep(
+        profile_sketch_id: str,
+        path_sketch_id: str,
+        profile_index: int = 0,
+        operation: str = "new_body",
+        orientation: str = "perpendicular",
+        name: Optional[str] = None,
+    ) -> dict:
+        """Sweep a 2D profile along a path to create complex 3D shapes.
+
+        Sweep takes a closed 2D profile and extrudes it along a 3D path,
+        creating tubular or channel-like shapes. Essential for pipes,
+        cables, handrails, and any geometry that follows a curved path.
+
+        **All dimensions in millimeters (mm).**
+
+        Args:
+            profile_sketch_id: ID of the sketch containing the closed profile
+                              to sweep. Must have at least one closed profile.
+            path_sketch_id: ID of the sketch containing the sweep path.
+                           The path can be a line, arc, spline, or connected
+                           curves.
+            profile_index: Which profile to sweep if sketch has multiple
+                          closed profiles. Default 0 (first profile).
+            operation: Boolean operation for the resulting body:
+                - "new_body": Create as a new solid body (default)
+                - "join": Add material to existing body
+                - "cut": Remove material from existing body
+                - "intersect": Keep only overlapping volume
+            orientation: How the profile aligns during sweep:
+                - "perpendicular": Profile stays perpendicular to path (default)
+                - "parallel": Profile maintains fixed orientation
+            name: Optional name for the created body.
+
+        Returns:
+            Dict containing:
+            - success: True if sweep succeeded
+            - feature: Feature info with id and type
+            - bodies: List of created/modified bodies
+            - orientation: The orientation mode used
+
+        Example:
+            # Create a pipe by sweeping a circle along a path
+            # 1. Create the profile sketch (circle for pipe cross-section)
+            profile_sketch = await create_sketch(plane="XY")
+            profile_id = profile_sketch["sketch"]["id"]
+            await draw_circle(sketch_id=profile_id, center_x=0, center_y=0, radius=5)
+
+            # 2. Create the path sketch (curved line for pipe path)
+            path_sketch = await create_sketch(plane="XZ")
+            path_id = path_sketch["sketch"]["id"]
+            await draw_spline(sketch_id=path_id, points=[
+                {"x": 0, "y": 0},
+                {"x": 50, "y": 20},
+                {"x": 100, "y": 0}
+            ])
+
+            # 3. Sweep to create pipe
+            result = await sweep(
+                profile_sketch_id=profile_id,
+                path_sketch_id=path_id
+            )
+        """
+        logger.info(
+            "sweep called",
+            profile_sketch_id=profile_sketch_id,
+            path_sketch_id=path_sketch_id,
+            profile_index=profile_index,
+            operation=operation,
+            orientation=orientation,
+        )
+        async with FusionClient() as client:
+            return await client.sweep(
+                profile_sketch_id=profile_sketch_id,
+                path_sketch_id=path_sketch_id,
+                profile_index=profile_index,
+                operation=operation,
+                orientation=orientation,
+                name=name,
+            )
+
+    @mcp.tool()
+    async def loft(
+        sketch_ids: List[str],
+        profile_indices: Optional[List[int]] = None,
+        operation: str = "new_body",
+        is_solid: bool = True,
+        is_closed: bool = False,
+        name: Optional[str] = None,
+    ) -> dict:
+        """Create a smooth 3D shape by transitioning between multiple profiles.
+
+        Loft creates geometry by smoothly blending between two or more 2D
+        profiles on different planes. Perfect for organic shapes, transitions
+        between different cross-sections, and aerodynamic forms.
+
+        **Profiles must be on different planes (offset in Z or parallel planes).**
+
+        Args:
+            sketch_ids: List of sketch IDs in order from start to end.
+                       Minimum 2 sketches required. Each must have a closed
+                       profile. Order determines the loft direction.
+            profile_indices: Optional list of profile indices for each sketch
+                           if sketches have multiple profiles. Default uses
+                           first profile (index 0) from each sketch.
+            operation: Boolean operation for the resulting body:
+                - "new_body": Create as a new solid body (default)
+                - "join": Add material to existing body
+                - "cut": Remove material from existing body
+                - "intersect": Keep only overlapping volume
+            is_solid: Create solid (True) or surface (False). Default True.
+            is_closed: Close the loft ends to create a hollow shape.
+                      Default False.
+            name: Optional name for the created body.
+
+        Returns:
+            Dict containing:
+            - success: True if loft succeeded
+            - feature: Feature info with id and type
+            - bodies: List of created/modified bodies
+            - sections_count: Number of profiles used
+            - is_solid, is_closed: Settings used
+
+        Example:
+            # Create a tapered shape from large square to small circle
+            # 1. Create bottom profile (large square)
+            bottom_sketch = await create_sketch(plane="XY", offset=0)
+            bottom_id = bottom_sketch["sketch"]["id"]
+            await draw_rectangle(sketch_id=bottom_id, x1=-25, y1=-25, x2=25, y2=25)
+
+            # 2. Create top profile (small circle)
+            top_sketch = await create_sketch(plane="XY", offset=50)
+            top_id = top_sketch["sketch"]["id"]
+            await draw_circle(sketch_id=top_id, center_x=0, center_y=0, radius=10)
+
+            # 3. Loft between them
+            result = await loft(sketch_ids=[bottom_id, top_id])
+        """
+        logger.info(
+            "loft called",
+            sketch_count=len(sketch_ids),
+            operation=operation,
+            is_solid=is_solid,
+            is_closed=is_closed,
+        )
+        async with FusionClient() as client:
+            return await client.loft(
+                sketch_ids=sketch_ids,
+                profile_indices=profile_indices,
+                operation=operation,
+                is_solid=is_solid,
+                is_closed=is_closed,
+                name=name,
+            )
+
+    @mcp.tool()
+    async def create_sphere(
+        radius: float,
+        x: float = 0.0,
+        y: float = 0.0,
+        z: float = 0.0,
+        name: Optional[str] = None,
+        component_id: Optional[str] = None,
+    ) -> dict:
+        """Create a solid sphere primitive.
+
+        Creates a perfect spherical body at the specified position.
+        Useful for balls, domes, beads, and spherical features.
+
+        **All dimensions in millimeters (mm).**
+
+        Args:
+            radius: Sphere radius in mm. Must be positive.
+            x: Center X position in mm. Default 0.
+            y: Center Y position in mm. Default 0.
+            z: Center Z position in mm. Default 0.
+            name: Optional name for the body.
+            component_id: Optional component ID to create sphere in.
+
+        Returns:
+            Dict containing:
+            - success: True if sphere was created
+            - body: Body info with id, name, bounding box
+            - feature: Feature info with id and type
+            - sphere: Geometry info with center, radius, diameter,
+              volume, and surface_area
+
+        Example:
+            # Create a ball bearing
+            bearing = await create_sphere(radius=5, name="BallBearing")
+
+            # Create a sphere at a specific location
+            await create_sphere(radius=10, x=50, y=0, z=25, name="Dome")
+        """
+        logger.info(
+            "create_sphere called",
+            radius=radius,
+            x=x,
+            y=y,
+            z=z,
+        )
+        async with FusionClient() as client:
+            return await client.create_sphere(
+                radius=radius,
+                x=x,
+                y=y,
+                z=z,
+                name=name,
+                component_id=component_id,
+            )
+
+    @mcp.tool()
+    async def create_torus(
+        major_radius: float,
+        minor_radius: float,
+        x: float = 0.0,
+        y: float = 0.0,
+        z: float = 0.0,
+        name: Optional[str] = None,
+        component_id: Optional[str] = None,
+    ) -> dict:
+        """Create a torus (donut/ring shape).
+
+        Creates a donut-shaped solid body. The major_radius defines the
+        distance from center to the tube center, and minor_radius defines
+        the tube thickness. Useful for O-rings, handles, and decorative
+        elements.
+
+        **All dimensions in millimeters (mm).**
+        **Constraint: minor_radius must be less than major_radius.**
+
+        Args:
+            major_radius: Distance from torus center to tube center in mm.
+                         Must be positive and greater than minor_radius.
+            minor_radius: Tube radius in mm. Must be positive and less
+                         than major_radius.
+            x: Center X position in mm. Default 0.
+            y: Center Y position in mm. Default 0.
+            z: Center Z position in mm. Default 0.
+            name: Optional name for the body.
+            component_id: Optional component ID to create torus in.
+
+        Returns:
+            Dict containing:
+            - success: True if torus was created
+            - body: Body info with id, name, bounding box
+            - feature: Feature info with id and type
+            - torus: Geometry info with center, major_radius, minor_radius,
+              volume, and surface_area
+
+        Example:
+            # Create an O-ring
+            oring = await create_torus(
+                major_radius=20,  # Ring diameter 40mm
+                minor_radius=2,   # Tube diameter 4mm
+                name="O-Ring"
+            )
+
+            # Create a decorative ring at position
+            await create_torus(
+                major_radius=15,
+                minor_radius=5,
+                x=0, y=0, z=50,
+                name="DecoRing"
+            )
+        """
+        logger.info(
+            "create_torus called",
+            major_radius=major_radius,
+            minor_radius=minor_radius,
+            x=x,
+            y=y,
+            z=z,
+        )
+        async with FusionClient() as client:
+            return await client.create_torus(
+                major_radius=major_radius,
+                minor_radius=minor_radius,
+                x=x,
+                y=y,
+                z=z,
+                name=name,
+                component_id=component_id,
+            )
+
+    @mcp.tool()
+    async def create_coil(
+        diameter: float,
+        pitch: float,
+        revolutions: float,
+        section_size: float,
+        section_type: str = "circular",
+        operation: str = "new_body",
+        name: Optional[str] = None,
+        x: float = 0.0,
+        y: float = 0.0,
+        z: float = 0.0,
+        component_id: Optional[str] = None,
+    ) -> dict:
+        """Create a helix/spring shape (coil).
+
+        **NOT SUPPORTED: This tool will return an error.**
+
+        The Fusion 360 API does not expose a createInput() method for
+        CoilFeatures, making programmatic coil creation impossible.
+
+        **Workarounds:**
+        1. Create coils manually in Fusion 360: Solid > Create > Coil
+        2. For spring-like shapes, use sweep() with a helical path sketch
+
+        Args:
+            diameter: Coil diameter in mm (outer diameter of the helix).
+            pitch: Distance between coils (vertical rise per revolution) in mm.
+            revolutions: Number of complete turns.
+            section_size: Wire/section diameter in mm.
+            section_type: "circular" or "square"
+            operation: "new_body", "join", "cut", "intersect"
+            name: Optional name for the body.
+            x: X position of coil center in mm.
+            y: Y position of coil center in mm.
+            z: Z position (base of coil) in mm.
+            component_id: Optional component ID.
+
+        Returns:
+            Dict with error explaining the API limitation.
+        """
+        logger.info(
+            "create_coil called",
+            diameter=diameter,
+            pitch=pitch,
+            revolutions=revolutions,
+            section_size=section_size,
+            section_type=section_type,
+            operation=operation,
+            x=x,
+            y=y,
+            z=z,
+        )
+        async with FusionClient() as client:
+            return await client.create_coil(
+                diameter=diameter,
+                pitch=pitch,
+                revolutions=revolutions,
+                section_size=section_size,
+                section_type=section_type,
+                operation=operation,
+                name=name,
+                x=x,
+                y=y,
+                z=z,
+                component_id=component_id,
+            )
+
+    @mcp.tool()
+    async def create_pipe(
+        path_sketch_id: str,
+        outer_diameter: float,
+        wall_thickness: float,
+        operation: str = "new_body",
+        name: Optional[str] = None,
+    ) -> dict:
+        """Create a hollow tubular shape (pipe) along a path.
+
+        Creates a hollow pipe that follows a sketch path. Unlike sweep
+        (which creates solid geometry), pipe automatically creates a
+        hollow tube with specified wall thickness. Perfect for plumbing,
+        tubing, cables, and conduits.
+
+        **All dimensions in millimeters (mm).**
+        **Constraint: wall_thickness must be less than outer_diameter/2.**
+
+        Args:
+            path_sketch_id: ID of the sketch containing the pipe path.
+                           Can be a line, arc, spline, or connected curves.
+            outer_diameter: Outer pipe diameter in mm. Must be positive.
+            wall_thickness: Pipe wall thickness in mm. Must be positive
+                           and less than half the outer diameter.
+            operation: Boolean operation for the resulting body:
+                - "new_body": Create as a new solid body (default)
+                - "join": Add material to existing body
+                - "cut": Remove material from existing body
+                - "intersect": Keep only overlapping volume
+            name: Optional name for the body.
+
+        Returns:
+            Dict containing:
+            - success: True if pipe was created
+            - feature: Feature info with id and type
+            - bodies: List of created/modified bodies
+            - pipe: Geometry info with outer_diameter, inner_diameter,
+              wall_thickness, path_sketch_id
+
+        Example:
+            # Create a curved pipe for plumbing
+            # 1. Create the path sketch
+            path_sketch = await create_sketch(plane="XZ")
+            path_id = path_sketch["sketch"]["id"]
+            await draw_arc(
+                sketch_id=path_id,
+                center_x=0, center_y=0,
+                radius=50,
+                start_angle=0, end_angle=90
+            )
+
+            # 2. Create the pipe along the path
+            pipe = await create_pipe(
+                path_sketch_id=path_id,
+                outer_diameter=20,    # 20mm OD
+                wall_thickness=2,     # 2mm wall = 16mm ID
+                name="ElbowPipe"
+            )
+            # inner_diameter = 20 - 2*2 = 16mm
+
+            # Create a straight pipe
+            straight_path = await create_sketch(plane="XY")
+            path_id2 = straight_path["sketch"]["id"]
+            await draw_line(sketch_id=path_id2, start_x=0, start_y=0, end_x=100, end_y=0)
+
+            await create_pipe(
+                path_sketch_id=path_id2,
+                outer_diameter=10,
+                wall_thickness=1,
+                name="StraightPipe"
+            )
+        """
+        logger.info(
+            "create_pipe called",
+            path_sketch_id=path_sketch_id,
+            outer_diameter=outer_diameter,
+            wall_thickness=wall_thickness,
+            operation=operation,
+        )
+        async with FusionClient() as client:
+            return await client.create_pipe(
+                path_sketch_id=path_sketch_id,
+                outer_diameter=outer_diameter,
+                wall_thickness=wall_thickness,
+                operation=operation,
+                name=name,
+            )
+
     logger.info("Creation tools registered")

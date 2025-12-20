@@ -78,6 +78,13 @@ from handlers.creation_handlers import (
     handle_fillet,
     handle_chamfer,
     handle_create_hole,
+    # Phase 8a: Advanced feature tools
+    handle_sweep,
+    handle_loft,
+    handle_create_sphere,
+    handle_create_torus,
+    handle_create_coil,
+    handle_create_pipe,
 )
 
 # Import modification handlers
@@ -261,6 +268,14 @@ def _register_task_handlers() -> None:
     _event_manager.register_task_handler("chamfer", handle_chamfer)
     _event_manager.register_task_handler("create_hole", handle_create_hole)
 
+    # Phase 8a: Advanced feature handlers
+    _event_manager.register_task_handler("sweep", handle_sweep)
+    _event_manager.register_task_handler("loft", handle_loft)
+    _event_manager.register_task_handler("create_sphere", handle_create_sphere)
+    _event_manager.register_task_handler("create_torus", handle_create_torus)
+    _event_manager.register_task_handler("create_coil", handle_create_coil)
+    _event_manager.register_task_handler("create_pipe", handle_create_pipe)
+
     # Phase 3: Modification handlers
     _event_manager.register_task_handler("move_body", handle_move_body)
     _event_manager.register_task_handler("rotate_body", handle_rotate_body)
@@ -340,6 +355,14 @@ def _register_creation_routes() -> None:
     FusionHTTPHandler.register_route("POST", "/create/fillet", "fillet")
     FusionHTTPHandler.register_route("POST", "/create/chamfer", "chamfer")
     FusionHTTPHandler.register_route("POST", "/create/hole", "create_hole")
+
+    # Phase 8a: Advanced feature creation routes
+    FusionHTTPHandler.register_route("POST", "/create/sweep", "sweep")
+    FusionHTTPHandler.register_route("POST", "/create/loft", "loft")
+    FusionHTTPHandler.register_route("POST", "/create/sphere", "create_sphere")
+    FusionHTTPHandler.register_route("POST", "/create/torus", "create_torus")
+    FusionHTTPHandler.register_route("POST", "/create/coil", "create_coil")
+    FusionHTTPHandler.register_route("POST", "/create/pipe", "create_pipe")
 
 
 def _register_modification_routes() -> None:
