@@ -2,10 +2,24 @@
 
 Converts Fusion 360 Feature, Parameter, and Timeline objects
 to JSON-serializable dictionaries matching Server Pydantic models.
+
+All linear dimension values are returned in millimeters (mm).
+Angular values remain in degrees.
 """
 
 from typing import Dict, Any, List, Optional, TYPE_CHECKING
-from .base import BaseSerializer, FusionObject
+from .base import BaseSerializer, FusionObject, cm_to_mm
+
+
+# Length unit detection
+LENGTH_UNITS = {'mm', 'cm', 'm', 'in', 'ft'}
+
+
+def is_length_unit(unit: str) -> bool:
+    """Check if unit is a length unit (needs conversion)."""
+    if not unit:
+        return False
+    return unit.lower() in LENGTH_UNITS
 
 if TYPE_CHECKING:
     from core.entity_registry import EntityRegistry
@@ -72,7 +86,8 @@ class FeatureSerializer(BaseSerializer):
             parameter: Fusion Parameter object (UserParameter or ModelParameter)
 
         Returns:
-            Dict matching Parameter Pydantic model
+            Dict matching Parameter Pydantic model.
+            Linear values are in mm, angular values in degrees.
         """
         param_id = self.registry.register_parameter(parameter)
 
@@ -82,6 +97,10 @@ class FeatureSerializer(BaseSerializer):
 
         # Get unit
         unit = self.safe_get(parameter, 'unit', '')
+
+        # Convert value from cm to mm for length units (not angles)
+        if is_length_unit(unit):
+            value = cm_to_mm(value)
 
         # Determine if user or model parameter
         is_user_parameter = "User" in type(parameter).__name__

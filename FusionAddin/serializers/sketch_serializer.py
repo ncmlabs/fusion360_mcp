@@ -2,10 +2,23 @@
 
 Converts Fusion 360 Sketch, SketchCurve, SketchConstraint, and Profile objects
 to JSON-serializable dictionaries matching Server Pydantic models.
+
+All dimensions are returned in millimeters (mm).
 """
 
 from typing import Dict, Any, List, Optional, TYPE_CHECKING
-from .base import BaseSerializer, FusionObject
+from .base import BaseSerializer, FusionObject, cm_to_mm
+
+
+# Length unit detection
+LENGTH_UNITS = {'mm', 'cm', 'm', 'in', 'ft'}
+
+
+def is_length_unit(unit: str) -> bool:
+    """Check if unit is a length unit (needs conversion)."""
+    if not unit:
+        return False
+    return unit.lower() in LENGTH_UNITS
 
 if TYPE_CHECKING:
     from core.entity_registry import EntityRegistry
@@ -270,7 +283,7 @@ class SketchSerializer(BaseSerializer):
                 result["end_point"] = self.serialize_point3d(
                     self.safe_get(end_point, 'geometry')
                 )
-            result["length"] = self.safe_get(curve, 'length', 0.0)
+            result["length"] = cm_to_mm(self.safe_get(curve, 'length', 0.0))
 
         elif curve_type == "circle":
             center_point = self.safe_get(curve, 'centerSketchPoint')
@@ -278,7 +291,7 @@ class SketchSerializer(BaseSerializer):
                 result["center"] = self.serialize_point3d(
                     self.safe_get(center_point, 'geometry')
                 )
-            result["radius"] = self.safe_get(curve, 'radius', 0.0)
+            result["radius"] = cm_to_mm(self.safe_get(curve, 'radius', 0.0))
 
         elif curve_type == "arc":
             center_point = self.safe_get(curve, 'centerSketchPoint')
@@ -286,7 +299,7 @@ class SketchSerializer(BaseSerializer):
                 result["center"] = self.serialize_point3d(
                     self.safe_get(center_point, 'geometry')
                 )
-            result["radius"] = self.safe_get(curve, 'radius', 0.0)
+            result["radius"] = cm_to_mm(self.safe_get(curve, 'radius', 0.0))
             start_point = self.safe_get(curve, 'startSketchPoint')
             end_point = self.safe_get(curve, 'endSketchPoint')
             if start_point:
@@ -304,8 +317,8 @@ class SketchSerializer(BaseSerializer):
                 result["center"] = self.serialize_point3d(
                     self.safe_get(center_point, 'geometry')
                 )
-            result["major_axis_radius"] = self.safe_get(curve, 'majorAxisRadius', 0.0)
-            result["minor_axis_radius"] = self.safe_get(curve, 'minorAxisRadius', 0.0)
+            result["major_axis_radius"] = cm_to_mm(self.safe_get(curve, 'majorAxisRadius', 0.0))
+            result["minor_axis_radius"] = cm_to_mm(self.safe_get(curve, 'minorAxisRadius', 0.0))
 
         return result
 
@@ -389,11 +402,17 @@ class SketchSerializer(BaseSerializer):
         value = 0.0
         expression = ""
         name = ""
+        unit = ""
 
         if parameter:
             value = self.safe_get(parameter, 'value', 0.0)
             expression = self.safe_get(parameter, 'expression', str(value))
             name = self.safe_get(parameter, 'name', dimension_id)
+            unit = self.safe_get(parameter, 'unit', '')
+
+            # Convert value from cm to mm for length units (not angles)
+            if is_length_unit(unit):
+                value = cm_to_mm(value)
 
         # Determine dimension type from class name
         dim_type = type(dimension).__name__.replace('Sketch', '').replace('Dimension', '').lower()

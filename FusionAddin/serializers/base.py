@@ -2,9 +2,17 @@
 
 Provides common serialization methods for geometry primitives that are
 shared across all entity serializers.
+
+All coordinates and dimensions are returned in millimeters (mm).
 """
 
 from typing import Dict, Any, Optional, TYPE_CHECKING
+
+
+# Unit conversion functions (inline to avoid import issues in Fusion 360)
+def cm_to_mm(value: float) -> float:
+    """Convert centimeters to millimeters."""
+    return round(value * 10.0, 6)
 
 if TYPE_CHECKING:
     from core.entity_registry import EntityRegistry
@@ -38,15 +46,15 @@ class BaseSerializer:
             point: Fusion Point3D object (adsk.core.Point3D)
 
         Returns:
-            Dict with x, y, z coordinates in cm (Fusion internal units)
+            Dict with x, y, z coordinates in millimeters (mm)
         """
         if point is None:
             return {"x": 0.0, "y": 0.0, "z": 0.0}
 
         return {
-            "x": getattr(point, 'x', 0.0),
-            "y": getattr(point, 'y', 0.0),
-            "z": getattr(point, 'z', 0.0),
+            "x": cm_to_mm(getattr(point, 'x', 0.0)),
+            "y": cm_to_mm(getattr(point, 'y', 0.0)),
+            "z": cm_to_mm(getattr(point, 'z', 0.0)),
         }
 
     def serialize_vector3d(self, vector: FusionObject) -> Dict[str, float]:
@@ -143,13 +151,18 @@ class BaseSerializer:
             except:
                 pass
 
-        # Extract translation from matrix
+        # Extract translation from matrix (convert cm to mm)
         translation = {"x": 0.0, "y": 0.0, "z": 0.0}
         get_translation = getattr(matrix, 'translation', None)
         if get_translation:
             try:
                 trans = matrix.translation
-                translation = self.serialize_vector3d(trans)
+                # Translation is a position offset, convert from cm to mm
+                translation = {
+                    "x": cm_to_mm(getattr(trans, 'x', 0.0)),
+                    "y": cm_to_mm(getattr(trans, 'y', 0.0)),
+                    "z": cm_to_mm(getattr(trans, 'z', 0.0)),
+                }
             except:
                 pass
 
