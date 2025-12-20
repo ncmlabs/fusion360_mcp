@@ -22,21 +22,24 @@ def handle_take_screenshot(args: Dict[str, Any]) -> Dict[str, Any]:
 
     Args:
         args: Request arguments
-            - file_path: Optional path to save image
+            - file_path: Path to save image (required)
             - view: View to capture ("current" or standard view name)
             - width: Image width in pixels (default 1920)
             - height: Image height in pixels (default 1080)
-            - return_base64: Return base64 encoded image (default True)
 
     Returns:
-        Dict with image data and metadata
+        Dict with image metadata
     """
+    from shared.exceptions import InvalidParameterError
+
+    if "file_path" not in args:
+        raise InvalidParameterError("file_path", None, reason="file_path is required")
+
     return take_screenshot(
-        file_path=args.get("file_path"),
+        file_path=args["file_path"],
         view=args.get("view", "current"),
         width=int(args.get("width", 1920)),
         height=int(args.get("height", 1080)),
-        return_base64=bool(args.get("return_base64", True)),
     )
 
 

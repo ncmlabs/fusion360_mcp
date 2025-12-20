@@ -22,21 +22,18 @@ def register_viewport_tools(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def take_screenshot(
-        file_path: Optional[str] = None,
+        file_path: str,
         view: str = "current",
         width: int = 1920,
         height: int = 1080,
-        return_base64: bool = True,
     ) -> dict:
         """Capture the current Fusion 360 viewport as a PNG image.
 
         Use this tool to visualize the current state of the design.
-        Screenshots can be saved to a file or returned as base64-encoded
-        data for immediate viewing.
+        Screenshots are saved to the specified file path.
 
         Args:
-            file_path: Optional path to save the image file. If not provided,
-                      image is returned as base64 encoded string only.
+            file_path: Path to save the image file (required).
             view: View to capture. Options:
                   - "current" (default): Capture current viewport as-is
                   - "front", "back", "top", "bottom", "left", "right": Standard orthographic views
@@ -45,23 +42,19 @@ def register_viewport_tools(mcp: FastMCP) -> None:
                   - "home": Default home view
             width: Image width in pixels (default 1920, max 8192)
             height: Image height in pixels (default 1080, max 8192)
-            return_base64: If True, include base64-encoded image data in response.
-                          If file_path is provided and this is False, only saves to file.
 
         Returns:
             Dict containing:
             - format: "png"
             - dimensions: {width, height}
             - view: View that was captured
-            - file_path: Path where image was saved (if file_path provided)
-            - base64_image: Base64 encoded PNG data (if return_base64=True)
+            - file_path: Path where image was saved
 
         Example usage:
-            # Capture current view as base64
-            result = take_screenshot()
-            image_data = result["base64_image"]
+            # Save current view to file
+            result = take_screenshot(file_path="/path/to/design.png")
 
-            # Save isometric view to file
+            # Save isometric view to file with custom resolution
             result = take_screenshot(
                 file_path="/path/to/design.png",
                 view="isometric",
@@ -82,7 +75,6 @@ def register_viewport_tools(mcp: FastMCP) -> None:
                 view=view,
                 width=width,
                 height=height,
-                return_base64=return_base64,
             )
 
     @mcp.tool()

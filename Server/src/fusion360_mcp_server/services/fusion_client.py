@@ -1953,32 +1953,28 @@ class FusionClient:
 
     async def take_screenshot(
         self,
-        file_path: Optional[str] = None,
+        file_path: str,
         view: str = "current",
         width: int = 1920,
         height: int = 1080,
-        return_base64: bool = True,
     ) -> Dict[str, Any]:
         """Capture the viewport as a PNG image.
 
         Args:
-            file_path: Optional path to save the image
+            file_path: Path to save the image (required)
             view: View to capture ("current" or standard view name)
             width: Image width in pixels
             height: Image height in pixels
-            return_base64: Return base64-encoded image data
 
         Returns:
-            Dict with image data and metadata
+            Dict with image metadata
         """
         data: Dict[str, Any] = {
+            "file_path": file_path,
             "view": view,
             "width": width,
             "height": height,
-            "return_base64": return_base64,
         }
-        if file_path is not None:
-            data["file_path"] = file_path
         return await self._request("POST", "/viewport/screenshot", data)
 
     async def set_camera(
