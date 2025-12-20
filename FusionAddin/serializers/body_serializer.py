@@ -2,10 +2,13 @@
 
 Converts Fusion 360 BRepBody, BRepFace, BRepEdge, and BRepVertex objects
 to JSON-serializable dictionaries matching Server Pydantic models.
+
+All dimensions are returned in millimeters (mm), areas in mm², volumes in mm³.
 """
 
 from typing import Dict, Any, List, Optional, TYPE_CHECKING
 from .base import BaseSerializer, FusionObject
+from utils.units import cm_to_mm, cm2_to_mm2, cm3_to_mm3
 
 if TYPE_CHECKING:
     from core.entity_registry import EntityRegistry
@@ -55,8 +58,8 @@ class BodySerializer(BaseSerializer):
         bbox = self.safe_get(body, 'boundingBox')
         bounding_box = self.serialize_bounding_box(bbox)
 
-        # Get physical properties
-        volume = self.safe_get(body, 'volume', 0.0)
+        # Get physical properties (convert cm³ to mm³)
+        volume = cm3_to_mm3(self.safe_get(body, 'volume', 0.0))
         is_solid = self.safe_get(body, 'isSolid', True)
 
         # Count faces
@@ -98,9 +101,9 @@ class BodySerializer(BaseSerializer):
         bbox = self.safe_get(body, 'boundingBox')
         bounding_box = self.serialize_bounding_box(bbox)
 
-        # Get physical properties
-        volume = self.safe_get(body, 'volume', 0.0)
-        area = self.safe_get(body, 'area', 0.0)
+        # Get physical properties (convert cm³ to mm³, cm² to mm²)
+        volume = cm3_to_mm3(self.safe_get(body, 'volume', 0.0))
+        area = cm2_to_mm2(self.safe_get(body, 'area', 0.0))
         is_solid = self.safe_get(body, 'isSolid', True)
         is_visible = self.safe_get(body, 'isVisible', True)
 
@@ -192,8 +195,8 @@ class BodySerializer(BaseSerializer):
 
         face_type = self.FACE_TYPE_MAP.get(surface_type, "spline")
 
-        # Get area
-        area = self.safe_get(face, 'area', 0.0)
+        # Get area (convert cm² to mm²)
+        area = cm2_to_mm2(self.safe_get(face, 'area', 0.0))
 
         # Get normal at centroid (evaluator method)
         normal = {"x": 0.0, "y": 0.0, "z": 1.0}
@@ -257,7 +260,7 @@ class BodySerializer(BaseSerializer):
             axis = self.safe_get(geometry, 'axis')
             if axis:
                 result["axis"] = self.serialize_vector3d(axis)
-            result["radius"] = self.safe_get(geometry, 'radius', 0.0)
+            result["radius"] = cm_to_mm(self.safe_get(geometry, 'radius', 0.0))
 
         if face_type == "conical" and geometry:
             axis = self.safe_get(geometry, 'axis')
@@ -294,8 +297,8 @@ class BodySerializer(BaseSerializer):
 
         edge_type = self.EDGE_TYPE_MAP.get(curve_type, "spline")
 
-        # Get length
-        length = self.safe_get(edge, 'length', 0.0)
+        # Get length (convert cm to mm)
+        length = cm_to_mm(self.safe_get(edge, 'length', 0.0))
 
         # Get start/end vertices
         start_vertex = self.safe_get(edge, 'startVertex')
@@ -339,7 +342,7 @@ class BodySerializer(BaseSerializer):
             center = self.safe_get(geometry, 'center')
             if center:
                 result["center"] = self.serialize_point3d(center)
-            result["radius"] = self.safe_get(geometry, 'radius', 0.0)
+            result["radius"] = cm_to_mm(self.safe_get(geometry, 'radius', 0.0))
 
         return result
 
