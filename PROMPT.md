@@ -123,7 +123,7 @@ This guide helps LLMs quickly identify the right tools and workflows when workin
 ### Viewport Tools (5 tools)
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
-| `take_screenshot(file_path?, view?, width?, height?)` | Capture image | Returns base64 |
+| `take_screenshot(file_path, view?, width?, height?)` | Capture image | Saves to file |
 | `set_camera(eye_x, eye_y, eye_z, ...)` | Position camera | Coordinates in mm |
 | `get_camera()` | Get camera state | None |
 | `set_view(view)` | Standard view | "isometric", "top", etc. |
@@ -509,7 +509,7 @@ Goal: Create 6 mounting holes in circular pattern
 | Extrude | `extrude` | sketch_id, distance |
 | Round edges | `fillet` | body_id, edge_ids, radius |
 | Check dimensions | `get_body_properties` | body_id |
-| Take picture | `take_screenshot` | view="isometric" |
+| Take picture | `take_screenshot` | file_path, view="isometric" |
 
 ### Critical Constraints
 
