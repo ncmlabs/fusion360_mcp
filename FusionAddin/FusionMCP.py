@@ -93,6 +93,11 @@ from handlers.creation_handlers import (
     handle_create_thread,
     handle_thicken,
     handle_emboss,
+    # Construction plane creation
+    handle_create_offset_plane,
+    handle_create_angle_plane,
+    handle_create_three_point_plane,
+    handle_create_midplane,
 )
 
 # Import modification handlers
@@ -304,6 +309,12 @@ def _register_task_handlers() -> None:
     _event_manager.register_task_handler("thicken", handle_thicken)
     _event_manager.register_task_handler("emboss", handle_emboss)
 
+    # Construction plane handlers
+    _event_manager.register_task_handler("create_offset_plane", handle_create_offset_plane)
+    _event_manager.register_task_handler("create_angle_plane", handle_create_angle_plane)
+    _event_manager.register_task_handler("create_three_point_plane", handle_create_three_point_plane)
+    _event_manager.register_task_handler("create_midplane", handle_create_midplane)
+
     # Phase 3: Modification handlers
     _event_manager.register_task_handler("move_body", handle_move_body)
     _event_manager.register_task_handler("rotate_body", handle_rotate_body)
@@ -408,6 +419,12 @@ def _register_creation_routes() -> None:
     FusionHTTPHandler.register_route("POST", "/create/thread", "create_thread")
     FusionHTTPHandler.register_route("POST", "/create/thicken", "thicken")
     FusionHTTPHandler.register_route("POST", "/create/emboss", "emboss")
+
+    # Construction plane routes
+    FusionHTTPHandler.register_route("POST", "/create/plane/offset", "create_offset_plane")
+    FusionHTTPHandler.register_route("POST", "/create/plane/angle", "create_angle_plane")
+    FusionHTTPHandler.register_route("POST", "/create/plane/three_points", "create_three_point_plane")
+    FusionHTTPHandler.register_route("POST", "/create/plane/midplane", "create_midplane")
 
 
 def _register_modification_routes() -> None:

@@ -30,6 +30,7 @@ class EntityRegistry:
         self._features: Dict[str, FusionEntity] = {}
         self._components: Dict[str, FusionEntity] = {}
         self._parameters: Dict[str, FusionEntity] = {}
+        self._construction_planes: Dict[str, FusionEntity] = {}
 
         # Sub-entities (faces, edges, vertices) use composite IDs
         # Format: "{parent_id}_{type}_{index}"
@@ -41,6 +42,7 @@ class EntityRegistry:
             "sketch": 0,
             "feature": 0,
             "component": 0,
+            "construction_plane": 0,
         }
 
     # --- Body Registration ---
@@ -208,6 +210,36 @@ class EntityRegistry:
         with self._lock:
             return list(self._parameters.keys())
 
+    # --- Construction Plane Registration ---
+
+    def register_construction_plane(self, plane: FusionEntity) -> str:
+        """Register a construction plane and return its stable ID.
+
+        Args:
+            plane: Fusion 360 ConstructionPlane object
+
+        Returns:
+            Stable ID for the construction plane
+        """
+        with self._lock:
+            for plane_id, existing in self._construction_planes.items():
+                if existing is plane:
+                    return plane_id
+
+            plane_id = self._generate_id(plane, "construction_plane")
+            self._construction_planes[plane_id] = plane
+            return plane_id
+
+    def get_construction_plane(self, plane_id: str) -> Optional[FusionEntity]:
+        """Get a construction plane by its ID."""
+        with self._lock:
+            return self._construction_planes.get(plane_id)
+
+    def get_available_construction_plane_ids(self) -> List[str]:
+        """Get list of all registered construction plane IDs."""
+        with self._lock:
+            return list(self._construction_planes.keys())
+
     # --- Sub-Entity Registration (Faces, Edges, Vertices) ---
 
     def register_sub_entity(
@@ -263,6 +295,8 @@ class EntityRegistry:
                 return self._components[entity_id]
             if entity_id in self._parameters:
                 return self._parameters[entity_id]
+            if entity_id in self._construction_planes:
+                return self._construction_planes[entity_id]
             if entity_id in self._sub_entities:
                 return self._sub_entities[entity_id]
             return None
@@ -280,6 +314,7 @@ class EntityRegistry:
             self._features.clear()
             self._components.clear()
             self._parameters.clear()
+            self._construction_planes.clear()
             self._sub_entities.clear()
 
             # Reset counters
@@ -351,6 +386,7 @@ class EntityRegistry:
             "feature": self._features,
             "component": self._components,
             "parameter": self._parameters,
+            "construction_plane": self._construction_planes,
         }
         return registries.get(entity_type, {})
 
@@ -369,6 +405,12 @@ class EntityRegistry:
         if sketches:
             for sketch in sketches:
                 self.register_sketch(sketch)
+
+        # Register construction planes
+        construction_planes = getattr(component, 'constructionPlanes', None)
+        if construction_planes:
+            for plane in construction_planes:
+                self.register_construction_plane(plane)
 
         # Register features from timeline
         features = getattr(component, 'features', None)

@@ -57,6 +57,12 @@ from operations.feature_ops import (
     thicken,
     emboss,
 )
+from operations.plane_ops import (
+    create_offset_plane,
+    create_angle_plane,
+    create_three_point_plane,
+    create_midplane,
+)
 from shared.exceptions import InvalidParameterError
 
 
@@ -1569,4 +1575,127 @@ def handle_emboss(args: Dict[str, Any]) -> Dict[str, Any]:
         is_emboss=bool(args.get("is_emboss", True)),
         profile_index=int(args.get("profile_index", 0)),
         taper_angle=float(args.get("taper_angle", 0)),
+    )
+
+
+# --- Construction Plane Handlers ---
+
+
+def handle_create_offset_plane(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle offset plane creation request.
+
+    Creates a construction plane offset from an existing plane or face.
+
+    Args:
+        args: Request arguments
+            - base_plane: Base plane ("XY", "YZ", "XZ", face_id, or plane_id) (required)
+            - offset: Offset distance in mm (required)
+            - name: Optional name for the plane
+            - component_id: Optional component ID
+
+    Returns:
+        Dict with plane info including id, origin, normal
+    """
+    if "base_plane" not in args:
+        raise InvalidParameterError("base_plane", None, reason="base_plane is required")
+    if "offset" not in args:
+        raise InvalidParameterError("offset", None, reason="offset is required")
+
+    return create_offset_plane(
+        base_plane=str(args["base_plane"]),
+        offset=float(args["offset"]),
+        name=args.get("name"),
+        component_id=args.get("component_id"),
+    )
+
+
+def handle_create_angle_plane(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle angle plane creation request.
+
+    Creates a construction plane at an angle from a plane along an edge.
+
+    Args:
+        args: Request arguments
+            - base_plane: Base plane ("XY", "YZ", "XZ", face_id, or plane_id) (required)
+            - edge_id: ID of the linear edge to rotate around (required)
+            - angle: Rotation angle in degrees (required)
+            - name: Optional name for the plane
+            - component_id: Optional component ID
+
+    Returns:
+        Dict with plane info including id, origin, normal
+    """
+    if "base_plane" not in args:
+        raise InvalidParameterError("base_plane", None, reason="base_plane is required")
+    if "edge_id" not in args:
+        raise InvalidParameterError("edge_id", None, reason="edge_id is required")
+    if "angle" not in args:
+        raise InvalidParameterError("angle", None, reason="angle is required")
+
+    return create_angle_plane(
+        base_plane=str(args["base_plane"]),
+        edge_id=str(args["edge_id"]),
+        angle=float(args["angle"]),
+        name=args.get("name"),
+        component_id=args.get("component_id"),
+    )
+
+
+def handle_create_three_point_plane(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle three-point plane creation request.
+
+    Creates a construction plane through three points.
+
+    Args:
+        args: Request arguments
+            - point1: First point {x, y, z} in mm (required)
+            - point2: Second point {x, y, z} in mm (required)
+            - point3: Third point {x, y, z} in mm (required)
+            - name: Optional name for the plane
+            - component_id: Optional component ID
+
+    Returns:
+        Dict with plane info including id, origin, normal
+    """
+    if "point1" not in args:
+        raise InvalidParameterError("point1", None, reason="point1 is required")
+    if "point2" not in args:
+        raise InvalidParameterError("point2", None, reason="point2 is required")
+    if "point3" not in args:
+        raise InvalidParameterError("point3", None, reason="point3 is required")
+
+    return create_three_point_plane(
+        point1=args["point1"],
+        point2=args["point2"],
+        point3=args["point3"],
+        name=args.get("name"),
+        component_id=args.get("component_id"),
+    )
+
+
+def handle_create_midplane(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle midplane creation request.
+
+    Creates a construction plane midway between two planes or faces.
+
+    Args:
+        args: Request arguments
+            - plane1: First plane ("XY", "YZ", "XZ", face_id, or plane_id) (required)
+            - plane2: Second plane (must be parallel to plane1) (required)
+            - name: Optional name for the plane
+            - component_id: Optional component ID
+
+    Returns:
+        Dict with plane info including id, origin, normal
+    """
+    if "plane1" not in args:
+        raise InvalidParameterError("plane1", None, reason="plane1 is required")
+    if "plane2" not in args:
+        raise InvalidParameterError("plane2", None, reason="plane2 is required")
+
+    return create_midplane(
+        plane1=str(args["plane1"]),
+        plane2=str(args["plane2"]),
+        name=args.get("name"),
+        component_id=args.get("component_id"),
     )
