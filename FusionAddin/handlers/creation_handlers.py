@@ -48,6 +48,10 @@ from operations.feature_ops import (
     create_torus,
     create_coil,
     create_pipe,
+    # Phase 8b: Feature Pattern Tools
+    rectangular_pattern,
+    circular_pattern,
+    mirror_feature,
 )
 from shared.exceptions import InvalidParameterError
 
@@ -1347,4 +1351,111 @@ def handle_create_pipe(args: Dict[str, Any]) -> Dict[str, Any]:
         wall_thickness=float(args["wall_thickness"]),
         operation=args.get("operation", "new_body"),
         name=args.get("name"),
+    )
+
+
+# --- Phase 8b: Feature Pattern Handlers ---
+
+
+def handle_rectangular_pattern(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle rectangular_pattern request.
+
+    Creates a rectangular (linear) pattern of bodies or features.
+
+    Args:
+        args: Request arguments
+            - entity_ids: List of body or feature IDs to pattern (required)
+            - entity_type: "bodies" or "features" (required)
+            - x_count: Number of columns (required, minimum 2)
+            - x_spacing: Column spacing in mm (required)
+            - x_axis: Direction for columns, "X", "Y", "Z" or edge_id (default X)
+            - y_count: Number of rows (default 1 for 1D pattern)
+            - y_spacing: Row spacing in mm (default 0, required if y_count > 1)
+            - y_axis: Direction for rows (default perpendicular to x_axis)
+
+    Returns:
+        Dict with pattern feature info and created instance IDs
+    """
+    if "entity_ids" not in args:
+        raise InvalidParameterError("entity_ids", None, reason="entity_ids is required")
+    if "entity_type" not in args:
+        raise InvalidParameterError("entity_type", None, reason="entity_type is required")
+    if "x_count" not in args:
+        raise InvalidParameterError("x_count", None, reason="x_count is required")
+    if "x_spacing" not in args:
+        raise InvalidParameterError("x_spacing", None, reason="x_spacing is required")
+
+    return rectangular_pattern(
+        entity_ids=args["entity_ids"],
+        entity_type=args["entity_type"],
+        x_count=int(args["x_count"]),
+        x_spacing=float(args["x_spacing"]),
+        x_axis=args.get("x_axis", "X"),
+        y_count=int(args.get("y_count", 1)),
+        y_spacing=float(args.get("y_spacing", 0.0)),
+        y_axis=args.get("y_axis"),
+    )
+
+
+def handle_circular_pattern(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle circular_pattern request.
+
+    Creates a circular (radial) pattern of bodies or features.
+
+    Args:
+        args: Request arguments
+            - entity_ids: List of body or feature IDs to pattern (required)
+            - entity_type: "bodies" or "features" (required)
+            - axis: Rotation axis "X", "Y", "Z" or axis_id (required)
+            - count: Number of instances including original (required, minimum 2)
+            - total_angle: Total angle span in degrees (default 360)
+            - is_symmetric: Distribute evenly within total_angle (default True)
+
+    Returns:
+        Dict with pattern feature info and created instance IDs
+    """
+    if "entity_ids" not in args:
+        raise InvalidParameterError("entity_ids", None, reason="entity_ids is required")
+    if "entity_type" not in args:
+        raise InvalidParameterError("entity_type", None, reason="entity_type is required")
+    if "axis" not in args:
+        raise InvalidParameterError("axis", None, reason="axis is required")
+    if "count" not in args:
+        raise InvalidParameterError("count", None, reason="count is required")
+
+    return circular_pattern(
+        entity_ids=args["entity_ids"],
+        entity_type=args["entity_type"],
+        axis=args["axis"],
+        count=int(args["count"]),
+        total_angle=float(args.get("total_angle", 360.0)),
+        is_symmetric=bool(args.get("is_symmetric", True)),
+    )
+
+
+def handle_mirror_feature(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle mirror_feature request.
+
+    Mirrors bodies or features across a plane.
+
+    Args:
+        args: Request arguments
+            - entity_ids: List of body or feature IDs to mirror (required)
+            - entity_type: "bodies" or "features" (required)
+            - mirror_plane: Mirror plane "XY", "YZ", "XZ" or plane_id (required)
+
+    Returns:
+        Dict with mirror feature info and created instance IDs
+    """
+    if "entity_ids" not in args:
+        raise InvalidParameterError("entity_ids", None, reason="entity_ids is required")
+    if "entity_type" not in args:
+        raise InvalidParameterError("entity_type", None, reason="entity_type is required")
+    if "mirror_plane" not in args:
+        raise InvalidParameterError("mirror_plane", None, reason="mirror_plane is required")
+
+    return mirror_feature(
+        entity_ids=args["entity_ids"],
+        entity_type=args["entity_type"],
+        mirror_plane=args["mirror_plane"],
     )

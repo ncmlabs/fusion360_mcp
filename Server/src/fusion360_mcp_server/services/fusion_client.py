@@ -1753,3 +1753,97 @@ class FusionClient:
         if name is not None:
             data["name"] = name
         return await self._request("POST", "/create/pipe", data)
+
+    # --- Phase 8b: Feature Pattern Methods ---
+
+    async def rectangular_pattern(
+        self,
+        entity_ids: List[str],
+        entity_type: str,
+        x_count: int,
+        x_spacing: float,
+        x_axis: str = "X",
+        y_count: int = 1,
+        y_spacing: float = 0.0,
+        y_axis: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a rectangular (linear) pattern of bodies or features.
+
+        Args:
+            entity_ids: List of body or feature IDs to pattern
+            entity_type: "bodies" or "features"
+            x_count: Number of columns (minimum 2)
+            x_spacing: Column spacing in mm
+            x_axis: Direction for columns ("X", "Y", "Z" or edge_id)
+            y_count: Number of rows (default 1 for 1D pattern)
+            y_spacing: Row spacing in mm
+            y_axis: Direction for rows (default perpendicular to x_axis)
+
+        Returns:
+            Dict with pattern feature info and created instance IDs
+        """
+        data: Dict[str, Any] = {
+            "entity_ids": entity_ids,
+            "entity_type": entity_type,
+            "x_count": x_count,
+            "x_spacing": x_spacing,
+            "x_axis": x_axis,
+            "y_count": y_count,
+            "y_spacing": y_spacing,
+        }
+        if y_axis is not None:
+            data["y_axis"] = y_axis
+        return await self._request("POST", "/pattern/rectangular", data)
+
+    async def circular_pattern(
+        self,
+        entity_ids: List[str],
+        entity_type: str,
+        axis: str,
+        count: int,
+        total_angle: float = 360.0,
+        is_symmetric: bool = True,
+    ) -> Dict[str, Any]:
+        """Create a circular (radial) pattern of bodies or features.
+
+        Args:
+            entity_ids: List of body or feature IDs to pattern
+            entity_type: "bodies" or "features"
+            axis: Rotation axis ("X", "Y", "Z" or axis_id)
+            count: Number of instances (including original, minimum 2)
+            total_angle: Total angle span in degrees (default 360)
+            is_symmetric: Distribute evenly within total_angle (default True)
+
+        Returns:
+            Dict with pattern feature info and created instance IDs
+        """
+        return await self._request("POST", "/pattern/circular", {
+            "entity_ids": entity_ids,
+            "entity_type": entity_type,
+            "axis": axis,
+            "count": count,
+            "total_angle": total_angle,
+            "is_symmetric": is_symmetric,
+        })
+
+    async def mirror_feature(
+        self,
+        entity_ids: List[str],
+        entity_type: str,
+        mirror_plane: str,
+    ) -> Dict[str, Any]:
+        """Mirror bodies or features across a plane.
+
+        Args:
+            entity_ids: List of body or feature IDs to mirror
+            entity_type: "bodies" or "features"
+            mirror_plane: Mirror plane ("XY", "YZ", "XZ" or plane_id)
+
+        Returns:
+            Dict with mirror feature info and created instance IDs
+        """
+        return await self._request("POST", "/pattern/mirror", {
+            "entity_ids": entity_ids,
+            "entity_type": entity_type,
+            "mirror_plane": mirror_plane,
+        })
