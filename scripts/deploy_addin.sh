@@ -73,6 +73,10 @@ cp "$SOURCE_DIR/serializers/"*.py "$TARGET_DIR/serializers/"
 mkdir -p "$TARGET_DIR/operations"
 cp "$SOURCE_DIR/operations/"*.py "$TARGET_DIR/operations/"
 
+# Copy utils module (unit conversion utilities)
+mkdir -p "$TARGET_DIR/utils"
+cp "$SOURCE_DIR/utils/"*.py "$TARGET_DIR/utils/"
+
 # Copy shared module (needed for exceptions)
 mkdir -p "$TARGET_DIR/shared"
 cp "$PROJECT_ROOT/shared/"*.py "$TARGET_DIR/shared/"

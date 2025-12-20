@@ -49,12 +49,55 @@ from handlers.creation_handlers import (
     handle_draw_circle,
     handle_draw_rectangle,
     handle_draw_arc,
+    # Advanced sketch geometry
+    handle_draw_polygon,
+    handle_draw_ellipse,
+    handle_draw_slot,
+    handle_draw_spline,
+    handle_draw_point,
+    # Phase 7b: Sketch patterns & operations
+    handle_sketch_mirror,
+    handle_sketch_circular_pattern,
+    handle_sketch_rectangular_pattern,
+    handle_project_geometry,
+    handle_add_sketch_text,
+    # Phase 7c: Sketch constraints & dimensions
+    handle_add_constraint_horizontal,
+    handle_add_constraint_vertical,
+    handle_add_constraint_coincident,
+    handle_add_constraint_perpendicular,
+    handle_add_constraint_parallel,
+    handle_add_constraint_tangent,
+    handle_add_constraint_equal,
+    handle_add_constraint_concentric,
+    handle_add_constraint_fix,
+    handle_add_dimension,
     # Feature creation
     handle_extrude,
     handle_revolve,
     handle_fillet,
     handle_chamfer,
     handle_create_hole,
+    # Phase 8a: Advanced feature tools
+    handle_sweep,
+    handle_loft,
+    handle_create_sphere,
+    handle_create_torus,
+    handle_create_coil,
+    handle_create_pipe,
+    # Phase 8b: Feature Pattern Tools
+    handle_rectangular_pattern,
+    handle_circular_pattern,
+    handle_mirror_feature,
+    # Phase 8c: Specialized Feature Tools
+    handle_create_thread,
+    handle_thicken,
+    handle_emboss,
+    # Construction plane creation
+    handle_create_offset_plane,
+    handle_create_angle_plane,
+    handle_create_three_point_plane,
+    handle_create_midplane,
 )
 
 # Import modification handlers
@@ -66,6 +109,24 @@ from handlers.modification_handlers import (
     handle_delete_body,
     handle_delete_feature,
     handle_edit_sketch,
+)
+
+# Import validation handlers
+from handlers.validation_handlers import (
+    handle_measure_distance,
+    handle_measure_angle,
+    handle_check_interference,
+    handle_get_body_properties,
+    handle_get_sketch_status,
+)
+
+# Import viewport handlers
+from handlers.viewport_handlers import (
+    handle_take_screenshot,
+    handle_set_camera,
+    handle_get_camera,
+    handle_set_view,
+    handle_fit_view,
 )
 
 # Import assembly handlers
@@ -128,6 +189,8 @@ def run(context: Dict[str, Any]) -> None:
         _register_query_routes()
         _register_creation_routes()
         _register_modification_routes()
+        _register_validation_routes()
+        _register_viewport_routes()
         _register_assembly_routes()
 
         # Start HTTP server
@@ -211,12 +274,62 @@ def _register_task_handlers() -> None:
     _event_manager.register_task_handler("draw_rectangle", handle_draw_rectangle)
     _event_manager.register_task_handler("draw_arc", handle_draw_arc)
 
+    # Phase 7a: Advanced sketch geometry handlers
+    _event_manager.register_task_handler("draw_polygon", handle_draw_polygon)
+    _event_manager.register_task_handler("draw_ellipse", handle_draw_ellipse)
+    _event_manager.register_task_handler("draw_slot", handle_draw_slot)
+    _event_manager.register_task_handler("draw_spline", handle_draw_spline)
+    _event_manager.register_task_handler("draw_point", handle_draw_point)
+
+    # Phase 7b: Sketch patterns & operations handlers
+    _event_manager.register_task_handler("sketch_mirror", handle_sketch_mirror)
+    _event_manager.register_task_handler("sketch_circular_pattern", handle_sketch_circular_pattern)
+    _event_manager.register_task_handler("sketch_rectangular_pattern", handle_sketch_rectangular_pattern)
+    _event_manager.register_task_handler("project_geometry", handle_project_geometry)
+    _event_manager.register_task_handler("add_sketch_text", handle_add_sketch_text)
+
+    # Phase 7c: Sketch constraints & dimensions handlers
+    _event_manager.register_task_handler("add_constraint_horizontal", handle_add_constraint_horizontal)
+    _event_manager.register_task_handler("add_constraint_vertical", handle_add_constraint_vertical)
+    _event_manager.register_task_handler("add_constraint_coincident", handle_add_constraint_coincident)
+    _event_manager.register_task_handler("add_constraint_perpendicular", handle_add_constraint_perpendicular)
+    _event_manager.register_task_handler("add_constraint_parallel", handle_add_constraint_parallel)
+    _event_manager.register_task_handler("add_constraint_tangent", handle_add_constraint_tangent)
+    _event_manager.register_task_handler("add_constraint_equal", handle_add_constraint_equal)
+    _event_manager.register_task_handler("add_constraint_concentric", handle_add_constraint_concentric)
+    _event_manager.register_task_handler("add_constraint_fix", handle_add_constraint_fix)
+    _event_manager.register_task_handler("add_dimension", handle_add_dimension)
+
     # Phase 2: Creation handlers - Features
     _event_manager.register_task_handler("extrude", handle_extrude)
     _event_manager.register_task_handler("revolve", handle_revolve)
     _event_manager.register_task_handler("fillet", handle_fillet)
     _event_manager.register_task_handler("chamfer", handle_chamfer)
     _event_manager.register_task_handler("create_hole", handle_create_hole)
+
+    # Phase 8a: Advanced feature handlers
+    _event_manager.register_task_handler("sweep", handle_sweep)
+    _event_manager.register_task_handler("loft", handle_loft)
+    _event_manager.register_task_handler("create_sphere", handle_create_sphere)
+    _event_manager.register_task_handler("create_torus", handle_create_torus)
+    _event_manager.register_task_handler("create_coil", handle_create_coil)
+    _event_manager.register_task_handler("create_pipe", handle_create_pipe)
+
+    # Phase 8b: Feature pattern handlers
+    _event_manager.register_task_handler("rectangular_pattern", handle_rectangular_pattern)
+    _event_manager.register_task_handler("circular_pattern", handle_circular_pattern)
+    _event_manager.register_task_handler("mirror_feature", handle_mirror_feature)
+
+    # Phase 8c: Specialized feature handlers
+    _event_manager.register_task_handler("create_thread", handle_create_thread)
+    _event_manager.register_task_handler("thicken", handle_thicken)
+    _event_manager.register_task_handler("emboss", handle_emboss)
+
+    # Construction plane handlers
+    _event_manager.register_task_handler("create_offset_plane", handle_create_offset_plane)
+    _event_manager.register_task_handler("create_angle_plane", handle_create_angle_plane)
+    _event_manager.register_task_handler("create_three_point_plane", handle_create_three_point_plane)
+    _event_manager.register_task_handler("create_midplane", handle_create_midplane)
 
     # Phase 3: Modification handlers
     _event_manager.register_task_handler("move_body", handle_move_body)
@@ -226,6 +339,20 @@ def _register_task_handlers() -> None:
     _event_manager.register_task_handler("delete_body", handle_delete_body)
     _event_manager.register_task_handler("delete_feature", handle_delete_feature)
     _event_manager.register_task_handler("edit_sketch", handle_edit_sketch)
+
+    # Phase 4: Validation handlers
+    _event_manager.register_task_handler("measure_distance", handle_measure_distance)
+    _event_manager.register_task_handler("measure_angle", handle_measure_angle)
+    _event_manager.register_task_handler("check_interference", handle_check_interference)
+    _event_manager.register_task_handler("get_body_properties", handle_get_body_properties)
+    _event_manager.register_task_handler("get_sketch_status", handle_get_sketch_status)
+
+    # Viewport handlers
+    _event_manager.register_task_handler("take_screenshot", handle_take_screenshot)
+    _event_manager.register_task_handler("set_camera", handle_set_camera)
+    _event_manager.register_task_handler("get_camera", handle_get_camera)
+    _event_manager.register_task_handler("set_view", handle_set_view)
+    _event_manager.register_task_handler("fit_view", handle_fit_view)
 
     # Phase 5: Assembly handlers - Components
     _event_manager.register_task_handler("create_component", handle_create_component)
@@ -275,12 +402,62 @@ def _register_creation_routes() -> None:
     FusionHTTPHandler.register_route("POST", "/sketch/rectangle", "draw_rectangle")
     FusionHTTPHandler.register_route("POST", "/sketch/arc", "draw_arc")
 
+    # Phase 7a: Advanced sketch geometry routes
+    FusionHTTPHandler.register_route("POST", "/sketch/polygon", "draw_polygon")
+    FusionHTTPHandler.register_route("POST", "/sketch/ellipse", "draw_ellipse")
+    FusionHTTPHandler.register_route("POST", "/sketch/slot", "draw_slot")
+    FusionHTTPHandler.register_route("POST", "/sketch/spline", "draw_spline")
+    FusionHTTPHandler.register_route("POST", "/sketch/point", "draw_point")
+
+    # Phase 7b: Sketch patterns & operations routes
+    FusionHTTPHandler.register_route("POST", "/sketch/mirror", "sketch_mirror")
+    FusionHTTPHandler.register_route("POST", "/sketch/circular_pattern", "sketch_circular_pattern")
+    FusionHTTPHandler.register_route("POST", "/sketch/rectangular_pattern", "sketch_rectangular_pattern")
+    FusionHTTPHandler.register_route("POST", "/sketch/project", "project_geometry")
+    FusionHTTPHandler.register_route("POST", "/sketch/text", "add_sketch_text")
+
+    # Phase 7c: Sketch constraints & dimensions routes
+    FusionHTTPHandler.register_route("POST", "/sketch/constraint/horizontal", "add_constraint_horizontal")
+    FusionHTTPHandler.register_route("POST", "/sketch/constraint/vertical", "add_constraint_vertical")
+    FusionHTTPHandler.register_route("POST", "/sketch/constraint/coincident", "add_constraint_coincident")
+    FusionHTTPHandler.register_route("POST", "/sketch/constraint/perpendicular", "add_constraint_perpendicular")
+    FusionHTTPHandler.register_route("POST", "/sketch/constraint/parallel", "add_constraint_parallel")
+    FusionHTTPHandler.register_route("POST", "/sketch/constraint/tangent", "add_constraint_tangent")
+    FusionHTTPHandler.register_route("POST", "/sketch/constraint/equal", "add_constraint_equal")
+    FusionHTTPHandler.register_route("POST", "/sketch/constraint/concentric", "add_constraint_concentric")
+    FusionHTTPHandler.register_route("POST", "/sketch/constraint/fix", "add_constraint_fix")
+    FusionHTTPHandler.register_route("POST", "/sketch/dimension", "add_dimension")
+
     # Phase 2: Feature creation routes
     FusionHTTPHandler.register_route("POST", "/create/extrude", "extrude")
     FusionHTTPHandler.register_route("POST", "/create/revolve", "revolve")
     FusionHTTPHandler.register_route("POST", "/create/fillet", "fillet")
     FusionHTTPHandler.register_route("POST", "/create/chamfer", "chamfer")
     FusionHTTPHandler.register_route("POST", "/create/hole", "create_hole")
+
+    # Phase 8a: Advanced feature creation routes
+    FusionHTTPHandler.register_route("POST", "/create/sweep", "sweep")
+    FusionHTTPHandler.register_route("POST", "/create/loft", "loft")
+    FusionHTTPHandler.register_route("POST", "/create/sphere", "create_sphere")
+    FusionHTTPHandler.register_route("POST", "/create/torus", "create_torus")
+    FusionHTTPHandler.register_route("POST", "/create/coil", "create_coil")
+    FusionHTTPHandler.register_route("POST", "/create/pipe", "create_pipe")
+
+    # Phase 8b: Feature pattern routes
+    FusionHTTPHandler.register_route("POST", "/pattern/rectangular", "rectangular_pattern")
+    FusionHTTPHandler.register_route("POST", "/pattern/circular", "circular_pattern")
+    FusionHTTPHandler.register_route("POST", "/pattern/mirror", "mirror_feature")
+
+    # Phase 8c: Specialized feature routes
+    FusionHTTPHandler.register_route("POST", "/create/thread", "create_thread")
+    FusionHTTPHandler.register_route("POST", "/create/thicken", "thicken")
+    FusionHTTPHandler.register_route("POST", "/create/emboss", "emboss")
+
+    # Construction plane routes
+    FusionHTTPHandler.register_route("POST", "/create/plane/offset", "create_offset_plane")
+    FusionHTTPHandler.register_route("POST", "/create/plane/angle", "create_angle_plane")
+    FusionHTTPHandler.register_route("POST", "/create/plane/three_points", "create_three_point_plane")
+    FusionHTTPHandler.register_route("POST", "/create/plane/midplane", "create_midplane")
 
 
 def _register_modification_routes() -> None:
@@ -299,6 +476,30 @@ def _register_modification_routes() -> None:
 
     # Phase 3: Sketch edit routes
     FusionHTTPHandler.register_route("POST", "/modify/sketch", "edit_sketch")
+
+
+def _register_validation_routes() -> None:
+    """Register HTTP routes for validation endpoints."""
+    # Phase 4: Measurement routes
+    FusionHTTPHandler.register_route("POST", "/validate/measure_distance", "measure_distance")
+    FusionHTTPHandler.register_route("POST", "/validate/measure_angle", "measure_angle")
+
+    # Phase 4: Interference detection routes
+    FusionHTTPHandler.register_route("POST", "/validate/check_interference", "check_interference")
+
+    # Phase 4: Property and status routes
+    FusionHTTPHandler.register_route("POST", "/validate/body_properties", "get_body_properties")
+    FusionHTTPHandler.register_route("POST", "/validate/sketch_status", "get_sketch_status")
+
+
+def _register_viewport_routes() -> None:
+    """Register HTTP routes for viewport endpoints."""
+    FusionHTTPHandler.register_route("POST", "/viewport/screenshot", "take_screenshot")
+    FusionHTTPHandler.register_route("POST", "/viewport/camera", "set_camera")
+    FusionHTTPHandler.register_route("GET", "/viewport/camera/get", "get_camera")
+    FusionHTTPHandler.register_route("POST", "/viewport/camera/get", "get_camera")
+    FusionHTTPHandler.register_route("POST", "/viewport/view", "set_view")
+    FusionHTTPHandler.register_route("POST", "/viewport/fit", "fit_view")
 
 
 def _register_assembly_routes() -> None:

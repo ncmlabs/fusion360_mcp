@@ -6,7 +6,6 @@ Uses pydantic-settings for environment variable support with validation.
 from pydantic_settings import BaseSettings
 from pydantic import Field
 from typing import Optional
-import os
 
 
 class ServerConfig(BaseSettings):

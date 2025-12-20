@@ -4,7 +4,7 @@ All errors are designed to be actionable - they tell the AI how to fix the probl
 """
 
 from typing import Optional, List, Dict, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass

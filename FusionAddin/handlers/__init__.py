@@ -38,6 +38,14 @@ from .modification_handlers import (
     handle_edit_sketch,
 )
 
+from .validation_handlers import (
+    handle_measure_distance,
+    handle_measure_angle,
+    handle_check_interference,
+    handle_get_body_properties,
+    handle_get_sketch_status,
+)
+
 from .assembly_handlers import (
     handle_create_component,
     handle_get_components,
@@ -84,6 +92,12 @@ __all__ = [
     "handle_delete_body",
     "handle_delete_feature",
     "handle_edit_sketch",
+    # Validation handlers
+    "handle_measure_distance",
+    "handle_measure_angle",
+    "handle_check_interference",
+    "handle_get_body_properties",
+    "handle_get_sketch_status",
     # Assembly handlers
     "handle_create_component",
     "handle_get_components",
