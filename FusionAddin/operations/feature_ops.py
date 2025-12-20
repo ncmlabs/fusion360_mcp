@@ -2245,23 +2245,31 @@ def emboss(
         if not sketch:
             raise EntityNotFoundError("sketch", sketch_id)
 
-        # Check for profiles
-        if sketch.profiles.count == 0:
+        # Check for profiles or text
+        # The emboss API accepts both Profile and SketchText objects
+        emboss_entities = []
+
+        if sketch.profiles.count > 0:
+            # Use profile if available
+            if profile_index >= sketch.profiles.count:
+                raise InvalidParameterError(
+                    "profile_index",
+                    profile_index,
+                    max_value=sketch.profiles.count - 1
+                )
+            emboss_entities.append(sketch.profiles.item(profile_index))
+        elif sketch.sketchTexts.count > 0:
+            # Use SketchText if no profiles but text exists
+            # Add all text entities to the emboss
+            for i in range(sketch.sketchTexts.count):
+                emboss_entities.append(sketch.sketchTexts.item(i))
+        else:
             raise FeatureError(
                 "emboss",
-                f"Sketch '{sketch_id}' has no closed profiles. "
-                "Emboss requires closed profile geometry.",
-                suggestion="Draw closed shapes (circles, rectangles) or ensure curves form closed loops"
+                f"Sketch '{sketch_id}' has no closed profiles or text. "
+                "Emboss requires closed profile geometry or SketchText.",
+                suggestion="Draw closed shapes (circles, rectangles) or add text with add_sketch_text()"
             )
-
-        if profile_index >= sketch.profiles.count:
-            raise InvalidParameterError(
-                "profile_index",
-                profile_index,
-                max_value=sketch.profiles.count - 1
-            )
-
-        profile = sketch.profiles.item(profile_index)
 
         # Get target face
         face = registry.get_sub_entity(face_id)
@@ -2288,16 +2296,16 @@ def emboss(
                 suggestion="Use extrude() with operation='join' (for raised) or 'cut' (for engraved)"
             )
 
-        # Create arrays for profiles and faces (API requires arrays)
-        profiles_array = [profile]
+        # Create arrays for profiles/text and faces (API requires arrays)
+        # emboss_entities already contains Profile or SketchText objects
         faces_array = [face]
 
         # Depth: positive for emboss (raised), negative for deboss (engraved)
         actual_depth = depth_cm if is_emboss else -depth_cm
         depth_value = adsk.core.ValueInput.createByReal(actual_depth)
 
-        # Create emboss input with profiles, faces, and depth
-        emboss_input = emboss_features.createInput(profiles_array, faces_array, depth_value)
+        # Create emboss input with profiles/text, faces, and depth
+        emboss_input = emboss_features.createInput(emboss_entities, faces_array, depth_value)
 
         # Create the emboss feature
         emboss_feature = emboss_features.add(emboss_input)
