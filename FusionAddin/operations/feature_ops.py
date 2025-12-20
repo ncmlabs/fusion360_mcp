@@ -626,18 +626,25 @@ def sweep(
     try:
         profile = profile_sketch.profiles.item(profile_index)
 
-        # Get path - use first curve or a path from connected curves
-        path = None
-        # Try to create a path from sketch curves
-        if path_curves.sketchLines.count > 0:
-            path = path_curves.sketchLines.item(0)
-        elif path_curves.sketchArcs.count > 0:
-            path = path_curves.sketchArcs.item(0)
-        elif path_curves.sketchFittedSplines.count > 0:
-            path = path_curves.sketchFittedSplines.item(0)
+        # Collect all curves from the path sketch into an ObjectCollection
+        curves_collection = adsk.core.ObjectCollection.create()
+
+        # Add all curves from the path sketch
+        for i in range(path_curves.sketchLines.count):
+            curves_collection.add(path_curves.sketchLines.item(i))
+        for i in range(path_curves.sketchArcs.count):
+            curves_collection.add(path_curves.sketchArcs.item(i))
+        for i in range(path_curves.sketchFittedSplines.count):
+            curves_collection.add(path_curves.sketchFittedSplines.item(i))
+
+        if curves_collection.count == 0:
+            raise FeatureError("sweep", "No valid path curves found in path sketch")
+
+        # Create a Path object from the curves
+        path = component.features.createPath(curves_collection)
 
         if not path:
-            raise FeatureError("sweep", "No valid path curve found in path sketch")
+            raise FeatureError("sweep", "Failed to create path from sketch curves")
 
         # Create sweep input
         sweeps = component.features.sweepFeatures
@@ -997,15 +1004,17 @@ def create_torus(
         y_cm = y / 10.0
         z_cm = z / 10.0
 
-        # Create sketch on XZ plane (we'll revolve around Y axis)
+        # Create sketch on XZ plane (we'll revolve around Z axis)
+        # This creates a torus lying flat in XY plane with hole along Z
         planes = component.constructionPlanes
         sketches = component.sketches
 
         sketch = sketches.add(component.xZConstructionPlane)
 
-        # Draw circle at (x + major_radius, z) in XZ plane
+        # In XZ plane: sketch X = world X, sketch Y = world Z
+        # Draw circle at (major_radius, 0) in sketch coords = world (major_radius, 0, 0)
         circles = sketch.sketchCurves.sketchCircles
-        circle_center = adsk.core.Point3D.create(x_cm + major_cm, z_cm, 0)
+        circle_center = adsk.core.Point3D.create(major_cm, 0, 0)
         circle = circles.addByCenterRadius(circle_center, minor_cm)
 
         # Get the profile
@@ -1014,11 +1023,11 @@ def create_torus(
 
         profile = sketch.profiles.item(0)
 
-        # Revolve around Y axis (which is the origin axis in XZ plane view)
+        # Revolve around Z axis (perpendicular to XZ plane, through origin)
         revolves = component.features.revolveFeatures
         revolve_input = revolves.createInput(
             profile,
-            component.yConstructionAxis,
+            component.zConstructionAxis,
             adsk.fusion.FeatureOperations.NewBodyFeatureOperation
         )
 
@@ -1030,15 +1039,15 @@ def create_torus(
         if not revolve_feature:
             raise FeatureError("create_torus", "Failed to create torus")
 
-        # If y offset is needed, move the body
-        if abs(y_cm) > 0.0001:
+        # Move to final position if needed
+        if abs(x_cm) > 0.0001 or abs(y_cm) > 0.0001 or abs(z_cm) > 0.0001:
             body = revolve_feature.bodies.item(0)
             moves = component.features.moveFeatures
             move_input = moves.createInput2(body)
 
             # Create translation matrix
             transform = adsk.core.Matrix3D.create()
-            transform.translation = adsk.core.Vector3D.create(0, y_cm, 0)
+            transform.translation = adsk.core.Vector3D.create(x_cm, y_cm, z_cm)
             move_input.defineAsFreeMove(transform)
             moves.add(move_input)
 
@@ -1095,6 +1104,13 @@ def create_coil(
 ) -> Dict[str, Any]:
     """Create a helix/spring shape (coil).
 
+    NOTE: This feature is currently NOT SUPPORTED via the Fusion 360 API.
+    The CoilFeatures API does not expose a createInput() method, and the
+    text command workaround is unreliable and can crash Fusion 360.
+
+    To create coils, please use Fusion 360's UI directly:
+    Solid > Create > Coil
+
     Args:
         diameter: Coil diameter in mm
         pitch: Distance between coils in mm
@@ -1112,114 +1128,18 @@ def create_coil(
         Dict with body and feature info
 
     Raises:
-        InvalidParameterError: If parameters are invalid
-        FeatureError: If creation fails
+        FeatureError: Always - this feature is not supported via API
     """
-    if diameter <= 0:
-        raise InvalidParameterError("diameter", diameter, min_value=0.001)
-    if pitch <= 0:
-        raise InvalidParameterError("pitch", pitch, min_value=0.001)
-    if revolutions <= 0:
-        raise InvalidParameterError("revolutions", revolutions, min_value=0.001)
-    if section_size <= 0:
-        raise InvalidParameterError("section_size", section_size, min_value=0.001)
-    if section_type not in ["circular", "square"]:
-        raise InvalidParameterError("section_type", section_type, valid_values=["circular", "square"])
-    if operation not in OPERATION_MAP:
-        raise InvalidParameterError("operation", operation, valid_values=list(OPERATION_MAP.keys()))
-
-    design = _get_active_design()
-    registry = get_registry()
-
-    try:
-        # Get component
-        if component_id:
-            component = None
-            root = design.rootComponent
-            for occurrence in root.allOccurrences:
-                if occurrence.component.name == component_id:
-                    component = occurrence.component
-                    break
-            if not component:
-                component = root
-        else:
-            component = design.rootComponent
-
-        # Convert to cm
-        diameter_cm = diameter / 10.0
-        radius_cm = diameter_cm / 2.0
-        pitch_cm = pitch / 10.0
-        section_cm = section_size / 10.0
-        x_cm = x / 10.0
-        y_cm = y / 10.0
-        z_cm = z / 10.0
-
-        # Create coil feature
-        coils = component.features.coilFeatures
-
-        # Create a coil input using height and pitch mode
-        # We need to calculate height from revolutions and pitch
-        height_cm = revolutions * pitch_cm
-
-        # Create coil input
-        coil_input = coils.createInput(
-            adsk.core.ValueInput.createByReal(diameter_cm),
-            adsk.core.ValueInput.createByReal(pitch_cm),
-            adsk.core.ValueInput.createByReal(revolutions),
-            OPERATION_MAP[operation]
-        )
-
-        # Set axis to Z axis at the specified position
-        axis_point = adsk.core.Point3D.create(x_cm, y_cm, z_cm)
-        axis_direction = adsk.core.Vector3D.create(0, 0, 1)
-        coil_input.axisPoint = axis_point
-        coil_input.axisDirection = axis_direction
-
-        # Set section size
-        coil_input.sectionSize = adsk.core.ValueInput.createByReal(section_cm)
-
-        # Set section type
-        if section_type == "square":
-            coil_input.sectionType = adsk.fusion.CoilSectionTypes.SquareCoilSectionType
-        else:
-            coil_input.sectionType = adsk.fusion.CoilSectionTypes.CircularCoilSectionType
-
-        # Create the coil
-        coil_feature = coils.add(coil_input)
-
-        if not coil_feature:
-            raise FeatureError("create_coil", "Coil creation failed")
-
-        # Register feature
-        feature_id = registry.register_feature(coil_feature)
-
-        # Get and register body
-        created_bodies = []
-        for i in range(coil_feature.bodies.count):
-            body = coil_feature.bodies.item(i)
-            if name and coil_feature.bodies.count == 1:
-                body.name = name
-            registry.register_body(body)
-            created_bodies.append(body)
-
-        result = _serialize_feature_result(coil_feature, registry, created_bodies)
-        result["success"] = True
-        result["coil"] = {
-            "diameter": diameter,
-            "pitch": pitch,
-            "revolutions": revolutions,
-            "section_size": section_size,
-            "section_type": section_type,
-            "height": revolutions * pitch,
-            "position": {"x": x, "y": y, "z": z},
-        }
-
-        return result
-
-    except Exception as e:
-        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
-            raise
-        raise FeatureError("create_coil", f"Failed to create coil: {str(e)}", fusion_error=str(e))
+    raise FeatureError(
+        "create_coil",
+        "Coil creation is not supported via the Fusion 360 API. "
+        "The CoilFeatures API does not expose a createInput() method. "
+        "Please create coils manually using Fusion 360's UI: Solid > Create > Coil",
+        suggestions=[
+            "Use Fusion 360 UI: Solid > Create > Coil",
+            "Alternative: Create a helix path sketch and use sweep to create spring-like shapes",
+        ]
+    )
 
 
 def create_pipe(
@@ -1271,17 +1191,25 @@ def create_pipe(
         )
 
     try:
-        # Get path - use first curve or connected curves
-        path = None
-        if path_curves.sketchLines.count > 0:
-            path = path_curves.sketchLines.item(0)
-        elif path_curves.sketchArcs.count > 0:
-            path = path_curves.sketchArcs.item(0)
-        elif path_curves.sketchFittedSplines.count > 0:
-            path = path_curves.sketchFittedSplines.item(0)
+        # Collect all curves from the path sketch into an ObjectCollection
+        curves_collection = adsk.core.ObjectCollection.create()
+
+        # Add all curves from the path sketch
+        for i in range(path_curves.sketchLines.count):
+            curves_collection.add(path_curves.sketchLines.item(i))
+        for i in range(path_curves.sketchArcs.count):
+            curves_collection.add(path_curves.sketchArcs.item(i))
+        for i in range(path_curves.sketchFittedSplines.count):
+            curves_collection.add(path_curves.sketchFittedSplines.item(i))
+
+        if curves_collection.count == 0:
+            raise FeatureError("create_pipe", "No valid path curves found in path sketch")
+
+        # Create a Path object from the curves
+        path = component.features.createPath(curves_collection)
 
         if not path:
-            raise FeatureError("create_pipe", "No valid path curve found in path sketch")
+            raise FeatureError("create_pipe", "Failed to create path from sketch curves")
 
         # Convert to cm
         outer_cm = outer_diameter / 10.0
@@ -1295,12 +1223,10 @@ def create_pipe(
         pipe_input = pipes.createInput(path, OPERATION_MAP[operation])
 
         # Set diameter and wall thickness
+        # sectionThickness automatically sets isHollow to true
         pipe_input.sectionType = adsk.fusion.PipeSectionTypes.CircularPipeSectionType
         pipe_input.sectionSize = adsk.core.ValueInput.createByReal(outer_cm)
-        pipe_input.setWall(
-            adsk.fusion.PipeWallLocationTypes.OuterWallLocation,
-            adsk.core.ValueInput.createByReal(thickness_cm)
-        )
+        pipe_input.sectionThickness = adsk.core.ValueInput.createByReal(thickness_cm)
 
         # Create the pipe
         pipe_feature = pipes.add(pipe_input)

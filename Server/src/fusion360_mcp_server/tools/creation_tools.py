@@ -2302,61 +2302,30 @@ def register_creation_tools(mcp: FastMCP) -> None:
     ) -> dict:
         """Create a helix/spring shape (coil).
 
-        Creates a helical coil like a spring or thread. The coil spirals
-        upward along the Z axis from the specified position. Essential for
-        springs, threads, spiral staircases, and helical features.
+        **NOT SUPPORTED: This tool will return an error.**
 
-        **All dimensions in millimeters (mm).**
+        The Fusion 360 API does not expose a createInput() method for
+        CoilFeatures, making programmatic coil creation impossible.
+
+        **Workarounds:**
+        1. Create coils manually in Fusion 360: Solid > Create > Coil
+        2. For spring-like shapes, use sweep() with a helical path sketch
 
         Args:
             diameter: Coil diameter in mm (outer diameter of the helix).
             pitch: Distance between coils (vertical rise per revolution) in mm.
             revolutions: Number of complete turns.
-            section_size: Wire/section diameter in mm. For circular section,
-                         this is the wire diameter. For square, it's the
-                         side length.
-            section_type: Cross-section shape of the wire:
-                - "circular": Round wire (default)
-                - "square": Square cross-section
-            operation: Boolean operation for the resulting body:
-                - "new_body": Create as a new solid body (default)
-                - "join": Add material to existing body
-                - "cut": Remove material (for threads)
-                - "intersect": Keep only overlapping volume
+            section_size: Wire/section diameter in mm.
+            section_type: "circular" or "square"
+            operation: "new_body", "join", "cut", "intersect"
             name: Optional name for the body.
-            x: X position of coil center in mm. Default 0.
-            y: Y position of coil center in mm. Default 0.
-            z: Z position (base of coil) in mm. Default 0.
+            x: X position of coil center in mm.
+            y: Y position of coil center in mm.
+            z: Z position (base of coil) in mm.
             component_id: Optional component ID.
 
         Returns:
-            Dict containing:
-            - success: True if coil was created
-            - feature: Feature info with id and type
-            - bodies: List of created/modified bodies
-            - coil: Geometry info with diameter, pitch, revolutions,
-              section_size, section_type, height, position
-
-        Example:
-            # Create a compression spring
-            spring = await create_coil(
-                diameter=20,      # 20mm coil diameter
-                pitch=5,          # 5mm between coils
-                revolutions=10,   # 10 complete turns
-                section_size=2,   # 2mm wire diameter
-                section_type="circular",
-                name="CompressionSpring"
-            )
-            # Height will be revolutions * pitch = 50mm
-
-            # Create a square-section spiral
-            await create_coil(
-                diameter=30,
-                pitch=8,
-                revolutions=5,
-                section_size=4,
-                section_type="square"
-            )
+            Dict with error explaining the API limitation.
         """
         logger.info(
             "create_coil called",
