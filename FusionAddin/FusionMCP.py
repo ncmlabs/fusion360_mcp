@@ -89,6 +89,10 @@ from handlers.creation_handlers import (
     handle_rectangular_pattern,
     handle_circular_pattern,
     handle_mirror_feature,
+    # Phase 8c: Specialized Feature Tools
+    handle_create_thread,
+    handle_thicken,
+    handle_emboss,
 )
 
 # Import modification handlers
@@ -285,6 +289,11 @@ def _register_task_handlers() -> None:
     _event_manager.register_task_handler("circular_pattern", handle_circular_pattern)
     _event_manager.register_task_handler("mirror_feature", handle_mirror_feature)
 
+    # Phase 8c: Specialized feature handlers
+    _event_manager.register_task_handler("create_thread", handle_create_thread)
+    _event_manager.register_task_handler("thicken", handle_thicken)
+    _event_manager.register_task_handler("emboss", handle_emboss)
+
     # Phase 3: Modification handlers
     _event_manager.register_task_handler("move_body", handle_move_body)
     _event_manager.register_task_handler("rotate_body", handle_rotate_body)
@@ -377,6 +386,11 @@ def _register_creation_routes() -> None:
     FusionHTTPHandler.register_route("POST", "/pattern/rectangular", "rectangular_pattern")
     FusionHTTPHandler.register_route("POST", "/pattern/circular", "circular_pattern")
     FusionHTTPHandler.register_route("POST", "/pattern/mirror", "mirror_feature")
+
+    # Phase 8c: Specialized feature routes
+    FusionHTTPHandler.register_route("POST", "/create/thread", "create_thread")
+    FusionHTTPHandler.register_route("POST", "/create/thicken", "thicken")
+    FusionHTTPHandler.register_route("POST", "/create/emboss", "emboss")
 
 
 def _register_modification_routes() -> None:

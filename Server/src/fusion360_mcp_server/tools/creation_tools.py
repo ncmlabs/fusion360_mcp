@@ -2706,4 +2706,311 @@ def register_creation_tools(mcp: FastMCP) -> None:
                 mirror_plane=mirror_plane,
             )
 
+    # --- Phase 8c: Specialized Feature Tools ---
+
+    @mcp.tool()
+    async def create_thread(
+        face_id: str,
+        thread_type: str,
+        thread_size: str,
+        is_internal: bool = False,
+        is_full_length: bool = True,
+        thread_length: Optional[float] = None,
+        is_modeled: bool = False,
+    ) -> dict:
+        """Add threads to a cylindrical face.
+
+        Creates threaded features on cylindrical faces for bolts, screws, nuts,
+        and threaded holes. Supports standard thread profiles like ISO Metric,
+        Unified Thread Standard (UTS), etc.
+
+        **Use this when**: Creating bolts, screws, nuts, threaded rods, or
+        threaded holes for mechanical assemblies.
+
+        Args:
+            face_id: ID of the cylindrical face to add thread to.
+                    Must be a cylindrical face from a shaft or hole.
+                    Get face IDs from get_body_by_id with include_faces=True.
+            thread_type: Thread standard/profile. Common options:
+                        - "ISO Metric profile": Standard metric threads (M6, M8, etc.)
+                        - "ANSI Metric M Profile": ANSI metric threads
+                        - "ANSI Unified Screw Threads": UNC, UNF threads
+                        - "ISO Metric Trapezoidal Threads": Trapezoidal/acme threads
+            thread_size: Thread designation matching the standard. Examples:
+                        - For ISO Metric: "M6x1", "M8x1.25", "M10x1.5", "M12x1.75"
+                        - For ANSI: "1/4-20 UNC", "3/8-16 UNC"
+            is_internal: True for internal threads (nuts/holes),
+                        False for external threads (bolts/screws). Default False.
+            is_full_length: True to thread the entire face length (default),
+                           False to specify a custom thread_length.
+            thread_length: Custom thread length in mm. Only used when
+                          is_full_length is False.
+            is_modeled: True to create actual 3D thread geometry (slower but
+                       visible in renders). False creates cosmetic threads
+                       (faster, shown as decorative lines). Default False.
+
+        Returns:
+            Dict containing:
+            - success: True if thread was created
+            - feature: Thread feature info with id and type
+            - thread: Thread specification including type, size, designation,
+                     class, pitch, and other properties
+            - face_id: The face that was threaded
+
+        Example:
+            # Create an M8 external thread on a shaft
+            # First create a cylinder for the shaft
+            shaft = await create_cylinder(radius=4, height=30)  # 8mm diameter
+            body_details = await get_body_by_id(
+                body_id=shaft["body"]["id"],
+                include_faces=True
+            )
+            # Find the cylindrical face (typically faces[1] or faces[2])
+            cyl_face_id = body_details["faces"][1]["id"]
+
+            result = await create_thread(
+                face_id=cyl_face_id,
+                thread_type="ISO Metric profile",
+                thread_size="M8x1.25",
+                is_internal=False
+            )
+
+            # Create an internal M6 thread in a hole
+            # First create a hole
+            hole = await create_hole(body_id="...", diameter=5, depth=15)
+            # Get the hole's cylindrical face
+            result = await create_thread(
+                face_id=hole_face_id,
+                thread_type="ISO Metric profile",
+                thread_size="M6x1",
+                is_internal=True
+            )
+
+            # Create a partial thread (threaded portion only)
+            result = await create_thread(
+                face_id=face_id,
+                thread_type="ISO Metric profile",
+                thread_size="M10x1.5",
+                is_full_length=False,
+                thread_length=15  # Only thread 15mm
+            )
+        """
+        logger.info(
+            "create_thread called",
+            face_id=face_id,
+            thread_type=thread_type,
+            thread_size=thread_size,
+            is_internal=is_internal,
+            is_full_length=is_full_length,
+            thread_length=thread_length,
+            is_modeled=is_modeled,
+        )
+        async with FusionClient() as client:
+            return await client.create_thread(
+                face_id=face_id,
+                thread_type=thread_type,
+                thread_size=thread_size,
+                is_internal=is_internal,
+                is_full_length=is_full_length,
+                thread_length=thread_length,
+                is_modeled=is_modeled,
+            )
+
+    @mcp.tool()
+    async def thicken(
+        face_ids: List[str],
+        thickness: float,
+        direction: str = "both",
+        operation: str = "new_body",
+        is_chain: bool = True,
+    ) -> dict:
+        """Add thickness to surface faces to create solid bodies.
+
+        Converts surface faces into solid bodies by adding thickness in
+        one or both directions. Useful for sheet metal design, creating
+        shells from surfaces, and converting imported surfaces to solids.
+
+        **Use this when**: Working with surface bodies, creating sheet metal
+        parts, or converting imported surface geometry to solids.
+
+        Args:
+            face_ids: List of face IDs to thicken. Get face IDs from
+                     get_body_by_id with include_faces=True.
+            thickness: Material thickness to add in mm. Must be positive.
+            direction: Direction to add thickness:
+                      - "both": Add thickness equally in both directions (default)
+                      - "positive": Add thickness in the face normal direction
+                      - "negative": Add thickness opposite to face normal
+            operation: Boolean operation with existing geometry:
+                      - "new_body": Create new solid body (default)
+                      - "join": Join with existing body
+                      - "cut": Subtract from existing body
+                      - "intersect": Keep only overlapping volume
+            is_chain: True to include tangent-connected faces (default),
+                     False to thicken only the specified faces.
+
+        Returns:
+            Dict containing:
+            - success: True if thicken was successful
+            - feature: Thicken feature info with id and type
+            - thicken: Thicken details including thickness, direction,
+                      operation, and source face count
+            - bodies: List of created/modified body information
+
+        Example:
+            # Create a surface and thicken it to make a shell
+            # First create a loft between two circles to get a surface
+            sketch1 = await create_sketch(plane="XY", offset=0)
+            await draw_circle(sketch_id=sketch1["sketch"]["id"], radius=20)
+            sketch2 = await create_sketch(plane="XY", offset=30)
+            await draw_circle(sketch_id=sketch2["sketch"]["id"], radius=10)
+
+            loft = await loft(
+                sketch_ids=[sketch1["sketch"]["id"], sketch2["sketch"]["id"]],
+                is_solid=False  # Creates a surface, not solid
+            )
+
+            # Get the surface face
+            body_details = await get_body_by_id(body_id=loft["body"]["id"], include_faces=True)
+            surface_face_id = body_details["faces"][0]["id"]
+
+            # Thicken the surface to create a solid shell
+            result = await thicken(
+                face_ids=[surface_face_id],
+                thickness=2,  # 2mm wall thickness
+                direction="both"  # 1mm each way = 2mm total
+            )
+
+            # Thicken to create sheet metal-like part
+            result = await thicken(
+                face_ids=[face_id],
+                thickness=1.5,
+                direction="negative",
+                operation="new_body"
+            )
+        """
+        logger.info(
+            "thicken called",
+            face_count=len(face_ids),
+            thickness=thickness,
+            direction=direction,
+            operation=operation,
+            is_chain=is_chain,
+        )
+        async with FusionClient() as client:
+            return await client.thicken(
+                face_ids=face_ids,
+                thickness=thickness,
+                direction=direction,
+                operation=operation,
+                is_chain=is_chain,
+            )
+
+    @mcp.tool()
+    async def emboss(
+        sketch_id: str,
+        face_id: str,
+        depth: float,
+        is_emboss: bool = True,
+        profile_index: int = 0,
+        taper_angle: float = 0.0,
+    ) -> dict:
+        """Create raised (emboss) or recessed (deboss/engrave) features from sketch profiles.
+
+        Projects sketch geometry onto a face and either raises it (emboss)
+        or cuts it into the surface (deboss/engrave). Perfect for adding
+        text, logos, serial numbers, or decorative patterns to parts.
+
+        **Use this when**: Adding text or graphics to parts, creating
+        nameplates, engraving serial numbers, or adding decorative reliefs.
+
+        Args:
+            sketch_id: ID of the sketch containing the profile/text to emboss.
+                      Create text using add_sketch_text, or use closed curves.
+                      The sketch should be on or parallel to the target face.
+            face_id: ID of the face to emboss onto. Get face IDs from
+                    get_body_by_id with include_faces=True.
+            depth: Emboss/deboss depth in mm. Must be positive.
+                  - For emboss: How much the feature protrudes from the face
+                  - For deboss: How deep the engraving cuts into the surface
+            is_emboss: True for raised emboss (default),
+                      False for recessed deboss/engraving.
+            profile_index: Index of which profile to use if sketch contains
+                          multiple closed profiles. Default 0 (first profile).
+            taper_angle: Side taper angle in degrees (0-89). Default 0 for
+                        straight sides. Use 5-15 for draft angles that help
+                        with molding or a beveled appearance.
+
+        Returns:
+            Dict containing:
+            - success: True if emboss was successful
+            - feature: Emboss feature info with id and type
+            - emboss: Emboss details including type (emboss/deboss), depth,
+                     taper_angle, and source IDs
+            - body_id: ID of the modified body
+
+        Example:
+            # Add embossed text to a box
+            # First create the box
+            box = await create_box(width=100, depth=50, height=10, name="nameplate")
+            box_id = box["body"]["id"]
+
+            # Get the top face
+            body_details = await get_body_by_id(body_id=box_id, include_faces=True)
+            top_face_id = body_details["faces"][0]["id"]  # Typically the top face
+
+            # Create a sketch on the top face with text
+            sketch = await create_sketch(plane=top_face_id)
+            await add_sketch_text(
+                sketch_id=sketch["sketch"]["id"],
+                text="SAMPLE",
+                height=8,
+                x=0,
+                y=0
+            )
+
+            # Emboss the text (raised letters)
+            result = await emboss(
+                sketch_id=sketch["sketch"]["id"],
+                face_id=top_face_id,
+                depth=0.5,  # 0.5mm raised
+                is_emboss=True
+            )
+
+            # Engrave text (recessed letters)
+            result = await emboss(
+                sketch_id=sketch["sketch"]["id"],
+                face_id=face_id,
+                depth=0.3,  # 0.3mm deep
+                is_emboss=False  # Deboss/engrave
+            )
+
+            # Add tapered emboss for better aesthetics
+            result = await emboss(
+                sketch_id=sketch_id,
+                face_id=face_id,
+                depth=1,
+                is_emboss=True,
+                taper_angle=10  # 10 degree draft angle
+            )
+        """
+        logger.info(
+            "emboss called",
+            sketch_id=sketch_id,
+            face_id=face_id,
+            depth=depth,
+            is_emboss=is_emboss,
+            profile_index=profile_index,
+            taper_angle=taper_angle,
+        )
+        async with FusionClient() as client:
+            return await client.emboss(
+                sketch_id=sketch_id,
+                face_id=face_id,
+                depth=depth,
+                is_emboss=is_emboss,
+                profile_index=profile_index,
+                taper_angle=taper_angle,
+            )
+
     logger.info("Creation tools registered")
