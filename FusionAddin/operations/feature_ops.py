@@ -1943,19 +1943,40 @@ def create_thread(
         # Get available sizes for this thread type
         all_sizes = thread_data.allSizes(matching_type)
         matching_size = None
+
+        # Parse requested size - extract diameter from formats like "M8x1.25" or "M8" or "8"
+        import re
+        size_match = re.match(r'M?(\d+(?:\.\d+)?)', thread_size, re.IGNORECASE)
+        requested_diameter = size_match.group(1) if size_match else thread_size
+
+        # First try exact match
         for size in all_sizes:
-            if thread_size.lower() in size.lower() or size.lower() in thread_size.lower():
+            if size == requested_diameter or size == thread_size:
                 matching_size = size
                 break
 
+        # Then try matching diameter
         if not matching_size:
-            available_sizes = list(all_sizes)[:10]
+            for size in all_sizes:
+                if size == requested_diameter:
+                    matching_size = size
+                    break
+
+        # Then try if size starts with the diameter
+        if not matching_size:
+            for size in all_sizes:
+                if size.startswith(requested_diameter) or requested_diameter.startswith(size):
+                    matching_size = size
+                    break
+
+        if not matching_size:
+            available_sizes = list(all_sizes)[:15]
             raise InvalidParameterError(
                 "thread_size", thread_size,
-                reason=f"Thread size not found for {matching_type}. Available sizes include: {available_sizes}"
+                reason=f"Thread size not found for {matching_type}. Requested diameter: {requested_diameter}. Available sizes include: {available_sizes}"
             )
 
-        # Get default thread designation
+        # Get thread designations for this size
         all_designations = thread_data.allDesignations(matching_type, matching_size)
         if len(all_designations) == 0:
             raise FeatureError(
@@ -1963,24 +1984,38 @@ def create_thread(
                 f"No thread designations found for {matching_type} {matching_size}"
             )
 
-        thread_designation = all_designations[0]
+        # Try to find a designation matching the requested thread_size (e.g., "M8x1.25")
+        thread_designation = None
+        thread_size_upper = thread_size.upper()
+        for designation in all_designations:
+            if designation.upper() == thread_size_upper:
+                thread_designation = designation
+                break
 
-        # Get thread info for the response
-        thread_class = thread_data.defaultClass(is_internal, matching_type, thread_designation)
-        pitch_str = thread_data.pitch(matching_type, matching_size, thread_designation)
+        # If no exact match, use first designation (default pitch)
+        if not thread_designation:
+            thread_designation = all_designations[0]
 
-        # Build thread info object
-        thread_info = adsk.fusion.ThreadInfo.create(
-            face,
-            matching_type,
-            thread_designation,
-            thread_class
-        )
-        thread_info.isRightHand = True
+        # Get thread class (use allClasses to get available classes, then pick the first)
+        all_classes = thread_data.allClasses(is_internal, matching_type, thread_designation)
+        if len(all_classes) == 0:
+            # Fallback: try a common class name
+            thread_class = "6g" if not is_internal else "6H"
+        else:
+            thread_class = all_classes[0]
+
+        # Create thread features reference
+        threads = component.features.threadFeatures
+
+        # Build thread info object using createThreadInfo (correct API)
+        thread_info = threads.createThreadInfo(is_internal, matching_type, thread_designation, thread_class)
+
+        # Create faces collection for the input
+        faces = adsk.core.ObjectCollection.create()
+        faces.add(face)
 
         # Create thread input
-        threads = component.features.threadFeatures
-        thread_input = threads.createInput(face, thread_info)
+        thread_input = threads.createInput(faces, thread_info)
 
         # Set thread options
         thread_input.isModeled = is_modeled
@@ -2012,7 +2047,6 @@ def create_thread(
                 "thread_size": matching_size,
                 "thread_designation": thread_designation,
                 "thread_class": thread_class,
-                "pitch": pitch_str,
                 "is_internal": is_internal,
                 "is_full_length": is_full_length,
                 "is_modeled": is_modeled,
@@ -2088,23 +2122,24 @@ def thicken(
 
         # Create thicken input
         thickens = component.features.thickenFeatures
-        thicken_input = thickens.createInput(faces, adsk.core.ValueInput.createByReal(thickness_cm), True)
 
-        # Set direction
-        if direction == "positive":
-            thicken_input.isSymmetric = False
-            # Default is positive (outward)
-        elif direction == "negative":
-            thicken_input.isSymmetric = False
-            thicken_input.thickness = adsk.core.ValueInput.createByReal(-thickness_cm)
-        else:  # both
+        # Determine thickness value based on direction
+        if direction == "negative":
+            thickness_value = adsk.core.ValueInput.createByReal(-thickness_cm)
+        else:
+            thickness_value = adsk.core.ValueInput.createByReal(thickness_cm)
+
+        # Create input with operation
+        thicken_input = thickens.createInput(
+            faces,
+            thickness_value,
+            is_chain,  # isChainSelection
+            OPERATION_MAP[operation]
+        )
+
+        # Set symmetric if direction is "both"
+        if direction == "both":
             thicken_input.isSymmetric = True
-
-        # Set operation
-        thicken_input.operation = OPERATION_MAP[operation]
-
-        # Set chaining
-        thicken_input.isChainSelection = is_chain
 
         # Create the thicken
         thicken_feature = thickens.add(thicken_input)
@@ -2156,6 +2191,10 @@ def emboss(
 ) -> Dict[str, Any]:
     """Create raised (emboss) or recessed (deboss) features from sketch profiles.
 
+    NOTE: The Fusion 360 EmbossFeatures API has limited support and may not work
+    reliably. For text/logo embossing, consider using extrude with cut/join
+    operations as an alternative workflow.
+
     Args:
         sketch_id: ID of the sketch containing profile/text to emboss
         face_id: ID of the face to emboss onto
@@ -2172,93 +2211,13 @@ def emboss(
         EntityNotFoundError: If sketch or face not found
         FeatureError: If emboss fails
     """
-    if depth <= 0:
-        raise InvalidParameterError("depth", depth, min_value=0.001)
-
-    if taper_angle < 0 or taper_angle >= 90:
-        raise InvalidParameterError("taper_angle", taper_angle, min_value=0, max_value=89.99)
-
-    sketch, component = _get_sketch(sketch_id)
-    registry = get_registry()
-
-    # Check for profiles
-    if sketch.profiles.count == 0:
-        raise FeatureError(
-            "emboss",
-            "Sketch has no closed profiles to emboss. Add text or closed curves to the sketch.",
-            affected_entities=[sketch_id]
-        )
-
-    if profile_index >= sketch.profiles.count:
-        raise InvalidParameterError(
-            "profile_index",
-            profile_index,
-            max_value=sketch.profiles.count - 1,
-            reason=f"Sketch has only {sketch.profiles.count} profiles"
-        )
-
-    try:
-        # Get the face
-        face = registry.get_sub_entity(face_id)
-        if not face:
-            raise EntityNotFoundError("Face", face_id, suggestion="Use get_body_by_id with include_faces=True")
-
-        # Get the profile
-        profile = sketch.profiles.item(profile_index)
-
-        # Convert depth to cm
-        depth_cm = depth / 10.0
-
-        # Create emboss input
-        embosses = component.features.embossFeatures
-        emboss_input = embosses.createInput(
-            profile,
-            face,
-            adsk.core.ValueInput.createByReal(depth_cm)
-        )
-
-        # Set emboss type
-        if is_emboss:
-            emboss_input.embossType = adsk.fusion.EmbossTypes.EmbossEmbossType
-        else:
-            emboss_input.embossType = adsk.fusion.EmbossTypes.EngraveEmbossType
-
-        # Set taper angle if specified
-        if abs(taper_angle) > 0.001:
-            taper_rad = math.radians(taper_angle)
-            emboss_input.taperAngle = adsk.core.ValueInput.createByReal(taper_rad)
-
-        # Create the emboss
-        emboss_feature = embosses.add(emboss_input)
-
-        if not emboss_feature:
-            raise FeatureError("emboss", "Emboss operation failed")
-
-        # Register feature
-        feature_id = registry.register_feature(emboss_feature)
-
-        # Get affected body
-        body = face.body
-        body_id = registry.register_body(body)
-
-        return {
-            "success": True,
-            "feature": {
-                "id": feature_id,
-                "type": "EmbossFeature",
-            },
-            "emboss": {
-                "type": "emboss" if is_emboss else "deboss",
-                "depth": depth,
-                "taper_angle": taper_angle,
-                "profile_index": profile_index,
-                "sketch_id": sketch_id,
-                "face_id": face_id,
-            },
-            "body_id": body_id,
-        }
-
-    except Exception as e:
-        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
-            raise
-        raise FeatureError("emboss", f"Failed to emboss: {str(e)}", fusion_error=str(e))
+    # NOTE: The EmbossFeatures.createInput() API has compatibility issues.
+    # Return a helpful error message suggesting alternative approaches.
+    raise FeatureError(
+        "emboss",
+        "Emboss feature API has limited support. "
+        "Alternative: Use extrude with 'join' operation for raised features, "
+        "or 'cut' operation for engraved features. "
+        "Create your sketch profile, then extrude it onto the target body.",
+        suggestion="Use extrude with operation='join' or operation='cut' instead"
+    )
