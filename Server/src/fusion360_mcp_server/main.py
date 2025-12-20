@@ -77,6 +77,28 @@ IMPORTANT:
 - move_body and rotate_body use parametric operations that preserve design history
 - Use update_parameter to change dimensions via expressions like "50 mm" or "d1 * 2"
 - Use take_screenshot() to visualize the design at any point in the workflow
+
+CRITICAL CONSTRAINTS:
+- All dimensions must be > 0.001 mm
+- create_torus: minor_radius must be < major_radius
+- create_pipe: wall_thickness must be < outer_diameter/2
+- loft with cut/join/intersect: REQUIRES target_body_id parameter
+- draw_polygon: sides must be 3-64
+- extrude/revolve: sketch must have closed profiles (profiles_count > 0)
+- add_sketch_text: creates SketchText (no profiles) - use emboss for text features
+- create_coil: NOT SUPPORTED - use sweep with helical path instead
+
+QUICK TOOL SELECTION:
+- Understand design → get_design_state(), get_bodies(), get_sketches()
+- Simple shapes → create_box(), create_cylinder(), create_sphere()
+- Custom 2D→3D → create_sketch() → draw_*() → extrude()
+- Along path → sweep() (solid) or create_pipe() (hollow)
+- Between profiles → loft() [remember target_body_id for cut/join]
+- Round edges → fillet()
+- Bevel edges → chamfer()
+- Patterns → circular_pattern(), rectangular_pattern()
+- Validate → measure_distance(), check_interference(), get_body_properties()
+- Visualize → take_screenshot(), set_view("isometric")
 """,
 )
 
