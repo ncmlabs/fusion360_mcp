@@ -7,8 +7,18 @@ All dimensions are returned in millimeters (mm), areas in mm², volumes in mm³.
 """
 
 from typing import Dict, Any, List, Optional, TYPE_CHECKING
-from .base import BaseSerializer, FusionObject
-from utils.units import cm_to_mm, cm2_to_mm2, cm3_to_mm3
+from .base import BaseSerializer, FusionObject, cm_to_mm
+
+
+# Additional unit conversion functions
+def cm2_to_mm2(value: float) -> float:
+    """Convert cm² to mm²."""
+    return round(value * 100.0, 6)
+
+
+def cm3_to_mm3(value: float) -> float:
+    """Convert cm³ to mm³."""
+    return round(value * 1000.0, 6)
 
 if TYPE_CHECKING:
     from core.entity_registry import EntityRegistry

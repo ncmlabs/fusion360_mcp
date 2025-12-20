@@ -7,8 +7,18 @@ All dimensions are returned in millimeters (mm).
 """
 
 from typing import Dict, Any, List, Optional, TYPE_CHECKING
-from .base import BaseSerializer, FusionObject
-from utils.units import cm_to_mm, is_length_unit
+from .base import BaseSerializer, FusionObject, cm_to_mm
+
+
+# Length unit detection
+LENGTH_UNITS = {'mm', 'cm', 'm', 'in', 'ft'}
+
+
+def is_length_unit(unit: str) -> bool:
+    """Check if unit is a length unit (needs conversion)."""
+    if not unit:
+        return False
+    return unit.lower() in LENGTH_UNITS
 
 if TYPE_CHECKING:
     from core.entity_registry import EntityRegistry

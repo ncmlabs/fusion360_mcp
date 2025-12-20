@@ -8,7 +8,11 @@ All coordinates and dimensions are returned in millimeters (mm).
 
 from typing import Dict, Any, Optional, TYPE_CHECKING
 
-from utils.units import cm_to_mm
+
+# Unit conversion functions (inline to avoid import issues in Fusion 360)
+def cm_to_mm(value: float) -> float:
+    """Convert centimeters to millimeters."""
+    return round(value * 10.0, 6)
 
 if TYPE_CHECKING:
     from core.entity_registry import EntityRegistry
