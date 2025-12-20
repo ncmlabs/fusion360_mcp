@@ -693,6 +693,7 @@ def loft(
     is_solid: bool = True,
     is_closed: bool = False,
     name: Optional[str] = None,
+    target_body_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Create a loft between multiple profiles.
 
@@ -703,6 +704,9 @@ def loft(
         is_solid: Create solid (True) or surface (False)
         is_closed: Close the loft ends
         name: Optional name for created body
+        target_body_id: Body ID for boolean operations (cut/join/intersect).
+                       When provided, this body will participate in the operation.
+                       Required for cut operations to work correctly.
 
     Returns:
         Dict with feature_id, body_id, and geometry info
@@ -720,6 +724,21 @@ def loft(
 
     if operation not in OPERATION_MAP:
         raise InvalidParameterError("operation", operation, valid_values=list(OPERATION_MAP.keys()))
+
+    # Validate target_body_id for boolean operations
+    is_boolean_operation = operation in ["cut", "join", "intersect"]
+    if is_boolean_operation and target_body_id is None:
+        raise InvalidParameterError(
+            "target_body_id",
+            None,
+            reason=f"target_body_id is required for '{operation}' operation. "
+                   f"Specify the body to {operation} from/with."
+        )
+
+    # Get target body for boolean operations
+    target_body = None
+    if target_body_id is not None:
+        target_body = _get_body(target_body_id)
 
     if profile_indices is None:
         profile_indices = [0] * len(sketch_ids)
@@ -769,6 +788,11 @@ def loft(
         # Set options
         loft_input.isSolid = is_solid
         loft_input.isClosed = is_closed
+
+        # Set participant bodies for boolean operations
+        if target_body is not None and is_boolean_operation:
+            # participantBodies expects a list of BRepBody objects
+            loft_input.participantBodies = [target_body]
 
         # Create the loft
         loft_feature = lofts.add(loft_input)
@@ -2191,10 +2215,6 @@ def emboss(
 ) -> Dict[str, Any]:
     """Create raised (emboss) or recessed (deboss) features from sketch profiles.
 
-    NOTE: The Fusion 360 EmbossFeatures API has limited support and may not work
-    reliably. For text/logo embossing, consider using extrude with cut/join
-    operations as an alternative workflow.
-
     Args:
         sketch_id: ID of the sketch containing profile/text to emboss
         face_id: ID of the face to emboss onto
@@ -2211,13 +2231,116 @@ def emboss(
         EntityNotFoundError: If sketch or face not found
         FeatureError: If emboss fails
     """
-    # NOTE: The EmbossFeatures.createInput() API has compatibility issues.
-    # Return a helpful error message suggesting alternative approaches.
-    raise FeatureError(
-        "emboss",
-        "Emboss feature API has limited support. "
-        "Alternative: Use extrude with 'join' operation for raised features, "
-        "or 'cut' operation for engraved features. "
-        "Create your sketch profile, then extrude it onto the target body.",
-        suggestion="Use extrude with operation='join' or operation='cut' instead"
-    )
+    if depth <= 0:
+        raise InvalidParameterError("depth", depth, min_value=0.001)
+    if taper_angle < 0 or taper_angle >= 90:
+        raise InvalidParameterError("taper_angle", taper_angle, min_value=0, max_value=89.999)
+
+    design = _get_active_design()
+    registry = get_registry()
+
+    try:
+        # Get sketch
+        sketch = registry.get_sketch(sketch_id)
+        if not sketch:
+            raise EntityNotFoundError("sketch", sketch_id)
+
+        # Check for profiles or text
+        # The emboss API accepts both Profile and SketchText objects
+        emboss_entities = []
+
+        if sketch.profiles.count > 0:
+            # Use profile if available
+            if profile_index >= sketch.profiles.count:
+                raise InvalidParameterError(
+                    "profile_index",
+                    profile_index,
+                    max_value=sketch.profiles.count - 1
+                )
+            emboss_entities.append(sketch.profiles.item(profile_index))
+        elif sketch.sketchTexts.count > 0:
+            # Use SketchText if no profiles but text exists
+            # Add all text entities to the emboss
+            for i in range(sketch.sketchTexts.count):
+                emboss_entities.append(sketch.sketchTexts.item(i))
+        else:
+            raise FeatureError(
+                "emboss",
+                f"Sketch '{sketch_id}' has no closed profiles or text. "
+                "Emboss requires closed profile geometry or SketchText.",
+                suggestion="Draw closed shapes (circles, rectangles) or add text with add_sketch_text()"
+            )
+
+        # Get target face
+        face = registry.get_sub_entity(face_id)
+        if not face:
+            raise EntityNotFoundError("face", face_id, suggestion="Use get_body_by_id with include_faces=True")
+
+        # Get the component containing the face
+        body = face.body
+        component = body.parentComponent
+
+        # Convert depth to cm
+        depth_cm = depth / 10.0
+        taper_rad = math.radians(taper_angle)
+
+        # Try to use the EmbossFeatures API
+        emboss_features = component.features.embossFeatures
+
+        # Check if createInput method exists
+        if not hasattr(emboss_features, 'createInput'):
+            raise FeatureError(
+                "emboss",
+                "The EmbossFeatures.createInput() method is not available in this Fusion 360 version. "
+                "Use extrude() with operation='join' or 'cut' as an alternative.",
+                suggestion="Use extrude() with operation='join' (for raised) or 'cut' (for engraved)"
+            )
+
+        # Create arrays for profiles/text and faces (API requires arrays)
+        # emboss_entities already contains Profile or SketchText objects
+        faces_array = [face]
+
+        # Depth: positive for emboss (raised), negative for deboss (engraved)
+        actual_depth = depth_cm if is_emboss else -depth_cm
+        depth_value = adsk.core.ValueInput.createByReal(actual_depth)
+
+        # Create emboss input with profiles/text, faces, and depth
+        emboss_input = emboss_features.createInput(emboss_entities, faces_array, depth_value)
+
+        # Create the emboss feature
+        emboss_feature = emboss_features.add(emboss_input)
+
+        if not emboss_feature:
+            raise FeatureError("emboss", "Failed to create emboss feature")
+
+        # Register feature
+        feature_id = registry.register_feature(emboss_feature)
+
+        return {
+            "success": True,
+            "feature": {
+                "id": feature_id,
+                "name": emboss_feature.name,
+                "type": "emboss" if is_emboss else "deboss",
+            },
+            "emboss": {
+                "type": "emboss" if is_emboss else "deboss",
+                "depth": depth,
+                "taper_angle": taper_angle,
+                "sketch_id": sketch_id,
+                "face_id": face_id,
+            },
+            "body_id": body.name if body else None,
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        # Provide helpful error with workaround
+        workaround = (
+            f"Emboss API error: {str(e)}\n\n"
+            "Alternative workflow:\n"
+            "For RAISED features: Use extrude() with operation='join'\n"
+            "For ENGRAVED features: Use extrude() with operation='cut' and direction='negative'"
+        )
+        raise FeatureError("emboss", workaround, fusion_error=str(e))

@@ -1578,6 +1578,7 @@ class FusionClient:
         is_solid: bool = True,
         is_closed: bool = False,
         name: Optional[str] = None,
+        target_body_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create a loft between multiple profiles.
 
@@ -1588,6 +1589,7 @@ class FusionClient:
             is_solid: Create solid (True) or surface (False)
             is_closed: Close the loft ends
             name: Optional name for created body
+            target_body_id: Body ID for boolean operations (cut/join/intersect)
 
         Returns:
             Dict with feature and body info
@@ -1602,6 +1604,8 @@ class FusionClient:
             data["profile_indices"] = profile_indices
         if name is not None:
             data["name"] = name
+        if target_body_id is not None:
+            data["target_body_id"] = target_body_id
         return await self._request("POST", "/create/loft", data)
 
     async def create_sphere(

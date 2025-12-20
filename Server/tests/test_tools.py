@@ -485,3 +485,146 @@ class TestToolDocstrings:
         register_system_tools(mcp)
         for name, tool in mcp._tool_manager._tools.items():
             assert tool.description, f"Tool {name} missing description"
+
+
+class TestLoftToolWithTargetBody:
+    """Tests for loft tool with target_body_id parameter."""
+
+    @pytest.mark.asyncio
+    async def test_loft_registered(self, mcp):
+        """Test that loft tool is registered."""
+        register_creation_tools(mcp)
+        tools = mcp._tool_manager._tools
+        assert "loft" in tools
+
+    @pytest.mark.asyncio
+    @patch('fusion360_mcp_server.tools.creation_tools.FusionClient')
+    async def test_loft_new_body_no_target_required(self, MockClient, mcp, mock_client):
+        """Test loft with new_body operation doesn't require target_body_id."""
+        MockClient.return_value = mock_client
+        mock_client.loft.return_value = {
+            "feature_id": "loft1",
+            "bodies": [{"id": "body1", "name": "Loft"}],
+        }
+
+        register_creation_tools(mcp)
+        tool = mcp._tool_manager._tools["loft"]
+        result = await tool.fn(
+            sketch_ids=["sketch1", "sketch2"],
+            operation="new_body"
+        )
+
+        mock_client.loft.assert_called_once()
+        assert result["feature_id"] == "loft1"
+
+    @pytest.mark.asyncio
+    @patch('fusion360_mcp_server.tools.creation_tools.FusionClient')
+    async def test_loft_cut_passes_target_body(self, MockClient, mcp, mock_client):
+        """Test loft with cut operation passes target_body_id correctly."""
+        MockClient.return_value = mock_client
+        mock_client.loft.return_value = {
+            "feature_id": "loft2",
+            "bodies": [{"id": "body1", "volume": 50000.0}],
+        }
+
+        register_creation_tools(mcp)
+        tool = mcp._tool_manager._tools["loft"]
+        result = await tool.fn(
+            sketch_ids=["inner1", "inner2"],
+            operation="cut",
+            target_body_id="outer_body"
+        )
+
+        # Verify target_body_id was passed to client
+        call_kwargs = mock_client.loft.call_args.kwargs
+        assert call_kwargs.get("target_body_id") == "outer_body"
+        assert call_kwargs.get("operation") == "cut"
+        assert result["feature_id"] == "loft2"
+
+    @pytest.mark.asyncio
+    @patch('fusion360_mcp_server.tools.creation_tools.FusionClient')
+    async def test_loft_join_passes_target_body(self, MockClient, mcp, mock_client):
+        """Test loft with join operation passes target_body_id correctly."""
+        MockClient.return_value = mock_client
+        mock_client.loft.return_value = {
+            "feature_id": "loft3",
+            "bodies": [{"id": "body1", "volume": 150000.0}],
+        }
+
+        register_creation_tools(mcp)
+        tool = mcp._tool_manager._tools["loft"]
+        result = await tool.fn(
+            sketch_ids=["sketch1", "sketch2"],
+            operation="join",
+            target_body_id="existing_body"
+        )
+
+        call_kwargs = mock_client.loft.call_args.kwargs
+        assert call_kwargs.get("target_body_id") == "existing_body"
+        assert call_kwargs.get("operation") == "join"
+
+    @pytest.mark.asyncio
+    @patch('fusion360_mcp_server.tools.creation_tools.FusionClient')
+    async def test_loft_intersect_passes_target_body(self, MockClient, mcp, mock_client):
+        """Test loft with intersect operation passes target_body_id correctly."""
+        MockClient.return_value = mock_client
+        mock_client.loft.return_value = {
+            "feature_id": "loft4",
+            "bodies": [{"id": "body1"}],
+        }
+
+        register_creation_tools(mcp)
+        tool = mcp._tool_manager._tools["loft"]
+        result = await tool.fn(
+            sketch_ids=["sketch1", "sketch2"],
+            operation="intersect",
+            target_body_id="intersect_body"
+        )
+
+        call_kwargs = mock_client.loft.call_args.kwargs
+        assert call_kwargs.get("target_body_id") == "intersect_body"
+        assert call_kwargs.get("operation") == "intersect"
+
+
+class TestEmbossToolApiLimitation:
+    """Tests for emboss tool with API limitation documentation."""
+
+    @pytest.mark.asyncio
+    async def test_emboss_registered(self, mcp):
+        """Test that emboss tool is registered."""
+        register_creation_tools(mcp)
+        tools = mcp._tool_manager._tools
+        assert "emboss" in tools
+
+    @pytest.mark.asyncio
+    async def test_emboss_has_warning_in_docstring(self, mcp):
+        """Test that emboss tool docstring contains API limitation warning."""
+        register_creation_tools(mcp)
+        tool = mcp._tool_manager._tools["emboss"]
+        description = tool.description
+
+        # Check for warning about API limitation
+        assert "NOT CURRENTLY SUPPORTED" in description or "WARNING" in description
+        assert "preview" in description.lower() or "alternative" in description.lower()
+
+    @pytest.mark.asyncio
+    @patch('fusion360_mcp_server.tools.creation_tools.FusionClient')
+    async def test_emboss_calls_client(self, MockClient, mcp, mock_client):
+        """Test that emboss tool calls FusionClient (which returns error)."""
+        MockClient.return_value = mock_client
+        # Simulate the error that the backend returns
+        from fusion360_mcp_server.exceptions import FusionMCPError
+        mock_client.emboss.side_effect = FusionMCPError(
+            "EmbossFeatures API does not support programmatic creation"
+        )
+
+        register_creation_tools(mcp)
+        tool = mcp._tool_manager._tools["emboss"]
+
+        with pytest.raises(FusionMCPError):
+            await tool.fn(
+                sketch_id="text_sketch",
+                face_id="body1_face_0",
+                depth=0.5,
+                is_emboss=True
+            )

@@ -1197,6 +1197,7 @@ def handle_loft(args: Dict[str, Any]) -> Dict[str, Any]:
             - is_solid: Create solid (True) or surface (False) (default True)
             - is_closed: Close the loft ends (default False)
             - name: Optional name for created body
+            - target_body_id: Body ID for boolean operations (required for cut/join/intersect)
 
     Returns:
         Dict with feature and body information
@@ -1219,6 +1220,7 @@ def handle_loft(args: Dict[str, Any]) -> Dict[str, Any]:
         is_solid=bool(args.get("is_solid", True)),
         is_closed=bool(args.get("is_closed", False)),
         name=args.get("name"),
+        target_body_id=args.get("target_body_id"),
     )
 
 
