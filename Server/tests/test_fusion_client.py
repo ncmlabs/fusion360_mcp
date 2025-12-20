@@ -672,3 +672,129 @@ class TestFusionClientValidationMethods:
 
         assert result["volume"] == 50000.0
         assert result["area"] == 7000.0
+
+
+class TestFusionClientLoftMethods:
+    """Tests for loft methods including cut operations."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_loft_new_body(self, client, config):
+        """Test loft with new_body operation (no target_body_id needed)."""
+        respx.post(f"{config.fusion_base_url}/create/loft").mock(
+            return_value=httpx.Response(200, json={
+                "success": True,
+                "data": {
+                    "feature_id": "loft1",
+                    "bodies": [{"id": "body1", "name": "Loft", "is_solid": True}],
+                }
+            })
+        )
+
+        async with client:
+            result = await client.loft(
+                sketch_ids=["sketch1", "sketch2"],
+                operation="new_body"
+            )
+
+        assert result["feature_id"] == "loft1"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_loft_cut_with_target_body(self, client, config):
+        """Test loft with cut operation passing target_body_id."""
+        respx.post(f"{config.fusion_base_url}/create/loft").mock(
+            return_value=httpx.Response(200, json={
+                "success": True,
+                "data": {
+                    "feature_id": "loft2",
+                    "bodies": [{"id": "body1", "volume": 50000.0}],
+                }
+            })
+        )
+
+        async with client:
+            result = await client.loft(
+                sketch_ids=["inner_sketch1", "inner_sketch2"],
+                operation="cut",
+                target_body_id="outer_body"
+            )
+
+        assert result["feature_id"] == "loft2"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_loft_join_with_target_body(self, client, config):
+        """Test loft with join operation passing target_body_id."""
+        respx.post(f"{config.fusion_base_url}/create/loft").mock(
+            return_value=httpx.Response(200, json={
+                "success": True,
+                "data": {
+                    "feature_id": "loft3",
+                    "bodies": [{"id": "body1", "volume": 100000.0}],
+                }
+            })
+        )
+
+        async with client:
+            result = await client.loft(
+                sketch_ids=["sketch1", "sketch2"],
+                operation="join",
+                target_body_id="existing_body"
+            )
+
+        assert result["feature_id"] == "loft3"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_loft_cut_missing_target_body_error(self, client, config):
+        """Test loft with cut operation raises error when target_body_id missing."""
+        respx.post(f"{config.fusion_base_url}/create/loft").mock(
+            return_value=httpx.Response(200, json={
+                "success": False,
+                "error_type": "InvalidParameter",
+                "error": "target_body_id is required for 'cut' operation",
+                "context": {
+                    "parameter_name": "target_body_id",
+                    "current_value": None,
+                },
+            })
+        )
+
+        async with client:
+            with pytest.raises(InvalidParameterError) as exc_info:
+                await client.loft(
+                    sketch_ids=["sketch1", "sketch2"],
+                    operation="cut"
+                    # Missing target_body_id
+                )
+
+        assert "target_body_id" in str(exc_info.value)
+
+
+class TestFusionClientEmbossMethods:
+    """Tests for emboss methods (API limitation)."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_emboss_returns_api_limitation_error(self, client, config):
+        """Test emboss returns error due to API limitation."""
+        respx.post(f"{config.fusion_base_url}/create/emboss").mock(
+            return_value=httpx.Response(200, json={
+                "success": False,
+                "error_type": "FeatureError",
+                "error": "EmbossFeatures API is in 'preview status'",
+                "context": {
+                    "workaround": "Use extrude with join/cut operations instead",
+                },
+            })
+        )
+
+        async with client:
+            with pytest.raises(FusionMCPError):
+                await client.emboss(
+                    sketch_id="text_sketch",
+                    face_id="body1_face_0",
+                    depth=0.5,
+                    is_emboss=True
+                )

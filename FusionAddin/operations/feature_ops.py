@@ -693,6 +693,7 @@ def loft(
     is_solid: bool = True,
     is_closed: bool = False,
     name: Optional[str] = None,
+    target_body_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Create a loft between multiple profiles.
 
@@ -703,6 +704,9 @@ def loft(
         is_solid: Create solid (True) or surface (False)
         is_closed: Close the loft ends
         name: Optional name for created body
+        target_body_id: Body ID for boolean operations (cut/join/intersect).
+                       When provided, this body will participate in the operation.
+                       Required for cut operations to work correctly.
 
     Returns:
         Dict with feature_id, body_id, and geometry info
@@ -720,6 +724,21 @@ def loft(
 
     if operation not in OPERATION_MAP:
         raise InvalidParameterError("operation", operation, valid_values=list(OPERATION_MAP.keys()))
+
+    # Validate target_body_id for boolean operations
+    is_boolean_operation = operation in ["cut", "join", "intersect"]
+    if is_boolean_operation and target_body_id is None:
+        raise InvalidParameterError(
+            "target_body_id",
+            None,
+            reason=f"target_body_id is required for '{operation}' operation. "
+                   f"Specify the body to {operation} from/with."
+        )
+
+    # Get target body for boolean operations
+    target_body = None
+    if target_body_id is not None:
+        target_body = _get_body(target_body_id)
 
     if profile_indices is None:
         profile_indices = [0] * len(sketch_ids)
@@ -769,6 +788,11 @@ def loft(
         # Set options
         loft_input.isSolid = is_solid
         loft_input.isClosed = is_closed
+
+        # Set participant bodies for boolean operations
+        if target_body is not None and is_boolean_operation:
+            # participantBodies expects a list of BRepBody objects
+            loft_input.participantBodies = [target_body]
 
         # Create the loft
         loft_feature = lofts.add(loft_input)
@@ -2191,9 +2215,8 @@ def emboss(
 ) -> Dict[str, Any]:
     """Create raised (emboss) or recessed (deboss) features from sketch profiles.
 
-    NOTE: The Fusion 360 EmbossFeatures API has limited support and may not work
-    reliably. For text/logo embossing, consider using extrude with cut/join
-    operations as an alternative workflow.
+    NOTE: The Fusion 360 EmbossFeatures API is in preview status and has limited
+    programmatic support. Use the alternative workflow described below.
 
     Args:
         sketch_id: ID of the sketch containing profile/text to emboss
@@ -2211,13 +2234,25 @@ def emboss(
         EntityNotFoundError: If sketch or face not found
         FeatureError: If emboss fails
     """
-    # NOTE: The EmbossFeatures.createInput() API has compatibility issues.
-    # Return a helpful error message suggesting alternative approaches.
+    # The EmbossFeatures API is in preview status and doesn't support
+    # programmatic creation reliably. Provide a detailed workaround.
+    workaround = (
+        "The Fusion 360 Emboss API is currently in preview and does not support "
+        "programmatic feature creation. Use this alternative workflow instead:\n\n"
+        "For RAISED features (emboss):\n"
+        "1. Create a sketch on an offset plane at the target face height\n"
+        "2. Draw your geometry (shapes work; for text, use Fusion 360 UI to 'Explode Text' first)\n"
+        "3. Use extrude() with operation='join' and target the body\n\n"
+        "For ENGRAVED features (deboss):\n"
+        "1. Create a sketch on the target face\n"
+        "2. Draw your geometry (shapes work; for text, explode in UI first)\n"
+        "3. Use extrude() with operation='cut' and direction='negative'\n\n"
+        "Note: add_sketch_text() creates SketchText entities which may not create "
+        "extrudable profiles directly. For text embossing, create text in Fusion 360 "
+        "UI and use 'Explode Text' to convert to curves, then use extrude."
+    )
     raise FeatureError(
         "emboss",
-        "Emboss feature API has limited support. "
-        "Alternative: Use extrude with 'join' operation for raised features, "
-        "or 'cut' operation for engraved features. "
-        "Create your sketch profile, then extrude it onto the target body.",
-        suggestion="Use extrude with operation='join' or operation='cut' instead"
+        workaround,
+        suggestion="Use extrude() with operation='join' (for raised) or 'cut' (for engraved)"
     )

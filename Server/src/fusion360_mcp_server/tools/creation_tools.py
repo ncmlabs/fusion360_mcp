@@ -2090,6 +2090,7 @@ def register_creation_tools(mcp: FastMCP) -> None:
         is_solid: bool = True,
         is_closed: bool = False,
         name: Optional[str] = None,
+        target_body_id: Optional[str] = None,
     ) -> dict:
         """Create a smooth 3D shape by transitioning between multiple profiles.
 
@@ -2115,6 +2116,10 @@ def register_creation_tools(mcp: FastMCP) -> None:
             is_closed: Close the loft ends to create a hollow shape.
                       Default False.
             name: Optional name for the created body.
+            target_body_id: Body ID for boolean operations (cut/join/intersect).
+                           **Required** when operation is "cut", "join", or
+                           "intersect". This specifies which existing body the
+                           loft will interact with.
 
         Returns:
             Dict containing:
@@ -2138,6 +2143,17 @@ def register_creation_tools(mcp: FastMCP) -> None:
 
             # 3. Loft between them
             result = await loft(sketch_ids=[bottom_id, top_id])
+
+            # 4. Create inner profiles and cut to hollow out
+            inner_bottom = await create_sketch(plane="XY", offset=0)
+            await draw_rectangle(sketch_id=inner_bottom["sketch"]["id"], x1=-20, y1=-20, x2=20, y2=20)
+            inner_top = await create_sketch(plane="XY", offset=50)
+            await draw_circle(sketch_id=inner_top["sketch"]["id"], center_x=0, center_y=0, radius=8)
+            await loft(
+                sketch_ids=[inner_bottom["sketch"]["id"], inner_top["sketch"]["id"]],
+                operation="cut",
+                target_body_id=result["bodies"][0]["id"]
+            )
         """
         logger.info(
             "loft called",
@@ -2145,6 +2161,7 @@ def register_creation_tools(mcp: FastMCP) -> None:
             operation=operation,
             is_solid=is_solid,
             is_closed=is_closed,
+            target_body_id=target_body_id,
         )
         async with FusionClient() as client:
             return await client.loft(
@@ -2154,6 +2171,7 @@ def register_creation_tools(mcp: FastMCP) -> None:
                 is_solid=is_solid,
                 is_closed=is_closed,
                 name=name,
+                target_body_id=target_body_id,
             )
 
     @mcp.tool()
@@ -2917,82 +2935,56 @@ def register_creation_tools(mcp: FastMCP) -> None:
     ) -> dict:
         """Create raised (emboss) or recessed (deboss/engrave) features from sketch profiles.
 
-        Projects sketch geometry onto a face and either raises it (emboss)
-        or cuts it into the surface (deboss/engrave). Perfect for adding
-        text, logos, serial numbers, or decorative patterns to parts.
+        **WARNING: NOT CURRENTLY SUPPORTED**
 
-        **Use this when**: Adding text or graphics to parts, creating
-        nameplates, engraving serial numbers, or adding decorative reliefs.
+        The Fusion 360 EmbossFeatures API is in "preview status" and does not
+        support programmatic creation. This tool will return an error with
+        workaround instructions.
+
+        **Alternative Workflow (Recommended):**
+        Instead of using emboss, use extrude() with join/cut operations:
+
+        1. For embossed text (raised letters):
+           - Create a sketch with closed profiles (circles, rectangles, etc.)
+           - Use extrude(sketch_id, distance, operation="join") to add material
+
+        2. For debossed/engraved text (recessed letters):
+           - Create a sketch with closed profiles
+           - Use extrude(sketch_id, distance, direction="negative", operation="cut")
+
+        **Note on Text:** add_sketch_text() creates SketchText entities which
+        do NOT automatically generate extrudable profiles. In Fusion 360's UI,
+        you would use "Explode Text" to convert text to curves, but this is
+        not available via the API. Use geometric shapes instead.
 
         Args:
             sketch_id: ID of the sketch containing the profile/text to emboss.
-                      Create text using add_sketch_text, or use closed curves.
-                      The sketch should be on or parallel to the target face.
-            face_id: ID of the face to emboss onto. Get face IDs from
-                    get_body_by_id with include_faces=True.
+            face_id: ID of the face to emboss onto.
             depth: Emboss/deboss depth in mm. Must be positive.
-                  - For emboss: How much the feature protrudes from the face
-                  - For deboss: How deep the engraving cuts into the surface
-            is_emboss: True for raised emboss (default),
-                      False for recessed deboss/engraving.
-            profile_index: Index of which profile to use if sketch contains
-                          multiple closed profiles. Default 0 (first profile).
-            taper_angle: Side taper angle in degrees (0-89). Default 0 for
-                        straight sides. Use 5-15 for draft angles that help
-                        with molding or a beveled appearance.
+            is_emboss: True for raised emboss, False for deboss/engraving.
+            profile_index: Index of which profile to use. Default 0.
+            taper_angle: Side taper angle in degrees (0-89). Default 0.
 
         Returns:
-            Dict containing:
-            - success: True if emboss was successful
-            - feature: Emboss feature info with id and type
-            - emboss: Emboss details including type (emboss/deboss), depth,
-                     taper_angle, and source IDs
-            - body_id: ID of the modified body
+            This tool currently returns an error with workaround instructions.
 
-        Example:
-            # Add embossed text to a box
-            # First create the box
-            box = await create_box(width=100, depth=50, height=10, name="nameplate")
+        Example (Alternative using extrude):
+            # Create a box with an engraved circle pattern
+            box = await create_box(width=100, depth=50, height=10)
             box_id = box["body"]["id"]
 
-            # Get the top face
-            body_details = await get_body_by_id(body_id=box_id, include_faces=True)
-            top_face_id = body_details["faces"][0]["id"]  # Typically the top face
+            # Create a sketch on the top face
+            sketch = await create_sketch(plane="XY", offset=10)
 
-            # Create a sketch on the top face with text
-            sketch = await create_sketch(plane=top_face_id)
-            await add_sketch_text(
-                sketch_id=sketch["sketch"]["id"],
-                text="SAMPLE",
-                height=8,
-                x=0,
-                y=0
-            )
+            # Draw a circle (this creates a valid profile, unlike text)
+            await draw_circle(sketch_id=sketch["sketch"]["id"],
+                             center_x=0, center_y=0, radius=10)
 
-            # Emboss the text (raised letters)
-            result = await emboss(
-                sketch_id=sketch["sketch"]["id"],
-                face_id=top_face_id,
-                depth=0.5,  # 0.5mm raised
-                is_emboss=True
-            )
-
-            # Engrave text (recessed letters)
-            result = await emboss(
-                sketch_id=sketch["sketch"]["id"],
-                face_id=face_id,
-                depth=0.3,  # 0.3mm deep
-                is_emboss=False  # Deboss/engrave
-            )
-
-            # Add tapered emboss for better aesthetics
-            result = await emboss(
-                sketch_id=sketch_id,
-                face_id=face_id,
-                depth=1,
-                is_emboss=True,
-                taper_angle=10  # 10 degree draft angle
-            )
+            # Engrave by extruding as a cut
+            await extrude(sketch_id=sketch["sketch"]["id"],
+                         distance=2,
+                         direction="negative",
+                         operation="cut")
         """
         logger.info(
             "emboss called",
