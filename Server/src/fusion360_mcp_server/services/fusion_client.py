@@ -1211,6 +1211,183 @@ class FusionClient:
             "properties": properties,
         })
 
+    # --- MODIFY Menu Methods ---
+
+    async def combine(
+        self,
+        target_body_id: str,
+        tool_body_ids: List[str],
+        operation: str = "join",
+        keep_tools: bool = False,
+    ) -> Dict[str, Any]:
+        """Combine multiple bodies using boolean operations.
+
+        Args:
+            target_body_id: ID of the body to modify (target)
+            tool_body_ids: List of body IDs to combine with (tools)
+            operation: "join", "cut", or "intersect"
+            keep_tools: If True, keep tool bodies after operation
+
+        Returns:
+            Dict with feature info and resulting body
+        """
+        return await self._request("POST", "/modify/combine", {
+            "target_body_id": target_body_id,
+            "tool_body_ids": tool_body_ids,
+            "operation": operation,
+            "keep_tools": keep_tools,
+        })
+
+    async def split_body(
+        self,
+        body_id: str,
+        splitting_tool: str,
+        extend_splitting_tool: bool = True,
+    ) -> Dict[str, Any]:
+        """Split a body using a plane or face.
+
+        Args:
+            body_id: ID of the body to split
+            splitting_tool: Face ID, plane ID, or "XY"/"YZ"/"XZ"
+            extend_splitting_tool: If True, extend tool to fully split body
+
+        Returns:
+            Dict with feature info and resulting bodies
+        """
+        return await self._request("POST", "/modify/split_body", {
+            "body_id": body_id,
+            "splitting_tool": splitting_tool,
+            "extend_splitting_tool": extend_splitting_tool,
+        })
+
+    async def shell(
+        self,
+        body_id: str,
+        face_ids: List[str],
+        thickness: float,
+        direction: str = "inside",
+    ) -> Dict[str, Any]:
+        """Create hollow shell by removing faces and adding wall thickness.
+
+        Args:
+            body_id: ID of the body to shell
+            face_ids: List of face IDs to remove (become openings)
+            thickness: Wall thickness in mm
+            direction: "inside" or "outside"
+
+        Returns:
+            Dict with feature info and resulting body
+        """
+        return await self._request("POST", "/modify/shell", {
+            "body_id": body_id,
+            "face_ids": face_ids,
+            "thickness": thickness,
+            "direction": direction,
+        })
+
+    async def draft(
+        self,
+        face_ids: List[str],
+        plane: str,
+        angle: float,
+        is_tangent_chain: bool = True,
+    ) -> Dict[str, Any]:
+        """Add draft angle to faces for mold release.
+
+        Args:
+            face_ids: List of face IDs to draft
+            plane: Pull direction plane (face_id or "XY"/"YZ"/"XZ")
+            angle: Draft angle in degrees
+            is_tangent_chain: If True, include tangent-connected faces
+
+        Returns:
+            Dict with feature info
+        """
+        return await self._request("POST", "/modify/draft", {
+            "face_ids": face_ids,
+            "plane": plane,
+            "angle": angle,
+            "is_tangent_chain": is_tangent_chain,
+        })
+
+    async def scale(
+        self,
+        body_ids: List[str],
+        scale_factor: float = 1.0,
+        point_x: float = 0.0,
+        point_y: float = 0.0,
+        point_z: float = 0.0,
+        x_scale: Optional[float] = None,
+        y_scale: Optional[float] = None,
+        z_scale: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Scale bodies uniformly or non-uniformly.
+
+        Args:
+            body_ids: List of body IDs to scale
+            scale_factor: Uniform scale factor (default 1.0)
+            point_x/y/z: Scale origin in mm
+            x_scale/y_scale/z_scale: Non-uniform scale factors
+
+        Returns:
+            Dict with feature info and scaled bodies
+        """
+        data = {
+            "body_ids": body_ids,
+            "scale_factor": scale_factor,
+            "point_x": point_x,
+            "point_y": point_y,
+            "point_z": point_z,
+        }
+        if x_scale is not None:
+            data["x_scale"] = x_scale
+        if y_scale is not None:
+            data["y_scale"] = y_scale
+        if z_scale is not None:
+            data["z_scale"] = z_scale
+        return await self._request("POST", "/modify/scale", data)
+
+    async def offset_face(
+        self,
+        face_ids: List[str],
+        distance: float,
+    ) -> Dict[str, Any]:
+        """Offset faces to add or remove material.
+
+        Args:
+            face_ids: List of face IDs to offset
+            distance: Offset distance in mm (positive=outward, negative=inward)
+
+        Returns:
+            Dict with feature info
+        """
+        return await self._request("POST", "/modify/offset_face", {
+            "face_ids": face_ids,
+            "distance": distance,
+        })
+
+    async def split_face(
+        self,
+        face_ids: List[str],
+        splitting_tool: str,
+        extend_splitting_tool: bool = True,
+    ) -> Dict[str, Any]:
+        """Split faces using edges or curves.
+
+        Args:
+            face_ids: List of face IDs to split
+            splitting_tool: Edge ID, curve ID, or sketch ID
+            extend_splitting_tool: If True, extend tool to fully split faces
+
+        Returns:
+            Dict with feature info
+        """
+        return await self._request("POST", "/modify/split_face", {
+            "face_ids": face_ids,
+            "splitting_tool": splitting_tool,
+            "extend_splitting_tool": extend_splitting_tool,
+        })
+
     # --- Validation Methods ---
 
     async def measure_distance(

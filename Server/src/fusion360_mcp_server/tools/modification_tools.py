@@ -405,3 +405,494 @@ def register_modification_tools(mcp: FastMCP) -> None:
                 curve_id=curve_id,
                 properties=properties,
             )
+
+    # --- MODIFY Menu Tools ---
+
+    @mcp.tool()
+    async def combine(
+        target_body_id: str,
+        tool_body_ids: list[str],
+        operation: str = "join",
+        keep_tools: bool = False,
+    ) -> dict:
+        """Combine multiple bodies using boolean operations.
+
+        Combines bodies using Join (add material), Cut (subtract material),
+        or Intersect (keep only overlapping volume).
+
+        **Use this when**: Merging separate bodies, creating cutouts,
+        or finding intersections between overlapping geometry.
+
+        Args:
+            target_body_id: ID of the body to modify (receives the result).
+                           Get from get_bodies() or body creation results.
+            tool_body_ids: List of body IDs to combine with the target.
+                          These are the "tools" that modify the target.
+            operation: Boolean operation type:
+                - "join": Add tool bodies to target (union)
+                - "cut": Subtract tool bodies from target (difference)
+                - "intersect": Keep only overlapping volume
+            keep_tools: If True, keep tool bodies after operation.
+                       Default False (tool bodies are consumed).
+
+        Returns:
+            Dict containing:
+            - success: True if combine succeeded
+            - feature: Feature info with id and type
+            - combine: Operation details (target, tools, operation, keep_tools)
+            - body: Resulting body info
+
+        Example:
+            # Create two overlapping boxes
+            box1 = await create_box(width=50, depth=50, height=50)
+            box2 = await create_box(width=30, depth=30, height=80, x=25)
+
+            # Join them into one body
+            result = await combine(
+                target_body_id=box1["body"]["id"],
+                tool_body_ids=[box2["body"]["id"]],
+                operation="join"
+            )
+
+            # Cut a cylinder from a box
+            box = await create_box(width=100, depth=100, height=20)
+            cyl = await create_cylinder(radius=15, height=30)
+
+            result = await combine(
+                target_body_id=box["body"]["id"],
+                tool_body_ids=[cyl["body"]["id"]],
+                operation="cut"
+            )
+        """
+        logger.info(
+            "combine called",
+            target_body_id=target_body_id,
+            tool_body_ids=tool_body_ids,
+            operation=operation,
+            keep_tools=keep_tools,
+        )
+        async with FusionClient() as client:
+            return await client.combine(
+                target_body_id=target_body_id,
+                tool_body_ids=tool_body_ids,
+                operation=operation,
+                keep_tools=keep_tools,
+            )
+
+    @mcp.tool()
+    async def split_body(
+        body_id: str,
+        splitting_tool: str,
+        extend_splitting_tool: bool = True,
+    ) -> dict:
+        """Split a body into multiple bodies using a plane or face.
+
+        Divides a single body into two or more separate bodies using
+        a splitting surface. The original body is replaced by the
+        resulting body pieces.
+
+        **Use this when**: Cutting parts in half, creating sections,
+        or dividing geometry for separate manufacturing.
+
+        Args:
+            body_id: ID of the body to split. Get from get_bodies().
+            splitting_tool: The surface to split with. Options:
+                - "XY", "YZ", "XZ": Standard construction planes
+                - face_id: A planar face from another body
+                - construction plane name or ID
+            extend_splitting_tool: If True, extend the splitting surface
+                to ensure complete split. Default True.
+
+        Returns:
+            Dict containing:
+            - success: True if split succeeded
+            - feature: Feature info with id and type
+            - split: Operation details (source body, tool, bodies created)
+            - bodies: List of resulting body info
+
+        Example:
+            # Split a box in half using the XY plane
+            box = await create_box(width=100, depth=50, height=40, z=-20)
+
+            result = await split_body(
+                body_id=box["body"]["id"],
+                splitting_tool="XY"
+            )
+            # Creates 2 bodies: one above and one below XY plane
+
+            # Split using a custom construction plane
+            plane = await create_offset_plane(base_plane="XY", offset=10)
+            result = await split_body(
+                body_id="Body1",
+                splitting_tool=plane["plane"]["id"]
+            )
+        """
+        logger.info(
+            "split_body called",
+            body_id=body_id,
+            splitting_tool=splitting_tool,
+            extend_splitting_tool=extend_splitting_tool,
+        )
+        async with FusionClient() as client:
+            return await client.split_body(
+                body_id=body_id,
+                splitting_tool=splitting_tool,
+                extend_splitting_tool=extend_splitting_tool,
+            )
+
+    @mcp.tool()
+    async def shell(
+        body_id: str,
+        face_ids: list[str],
+        thickness: float,
+        direction: str = "inside",
+    ) -> dict:
+        """Create a hollow shell from a solid body.
+
+        Removes selected faces from a solid body and adds uniform wall
+        thickness to create a hollow part. The removed faces become
+        openings in the shell.
+
+        **Use this when**: Creating enclosures, housings, containers,
+        or any hollow parts with uniform wall thickness.
+
+        **All dimensions in millimeters (mm).**
+
+        Args:
+            body_id: ID of the solid body to shell.
+            face_ids: List of face IDs to remove (become openings).
+                     Get face IDs from get_body_by_id with include_faces=True.
+            thickness: Wall thickness in mm. Must be positive.
+            direction: Direction to add material:
+                - "inside": Shell inward (default, most common)
+                - "outside": Shell outward
+
+        Returns:
+            Dict containing:
+            - success: True if shell succeeded
+            - feature: Feature info with id and type
+            - shell: Operation details (body, removed faces, thickness)
+            - body: Resulting body info
+
+        Example:
+            # Create a hollow box (remove top face)
+            box = await create_box(width=100, depth=80, height=50)
+            body = await get_body_by_id(
+                body_id=box["body"]["id"],
+                include_faces=True
+            )
+            # Find the top face (usually the one with max Z)
+            top_face_id = body["faces"][0]["id"]  # Identify correct face
+
+            result = await shell(
+                body_id=box["body"]["id"],
+                face_ids=[top_face_id],
+                thickness=3  # 3mm walls
+            )
+
+            # Shell outward for thin-walled containers
+            result = await shell(
+                body_id="Body1",
+                face_ids=["Body1_face_0"],
+                thickness=1.5,
+                direction="outside"
+            )
+        """
+        logger.info(
+            "shell called",
+            body_id=body_id,
+            face_ids=face_ids,
+            thickness=thickness,
+            direction=direction,
+        )
+        async with FusionClient() as client:
+            return await client.shell(
+                body_id=body_id,
+                face_ids=face_ids,
+                thickness=thickness,
+                direction=direction,
+            )
+
+    @mcp.tool()
+    async def draft(
+        face_ids: list[str],
+        plane: str,
+        angle: float,
+        is_tangent_chain: bool = True,
+    ) -> dict:
+        """Add draft angle to faces for mold release.
+
+        Applies a draft angle to selected faces, tapering them relative
+        to a pull direction. Essential for injection molding and casting
+        to allow parts to release from molds.
+
+        **Use this when**: Preparing parts for manufacturing via molding,
+        casting, or any process requiring draft angles.
+
+        **Angle in degrees (0-90).**
+
+        Args:
+            face_ids: List of face IDs to apply draft to.
+                     Get from get_body_by_id with include_faces=True.
+            plane: Pull direction plane (mold opening direction):
+                - "XY", "YZ", "XZ": Standard construction planes
+                - face_id: A planar face defining the direction
+                - construction plane name or ID
+            angle: Draft angle in degrees. Typical values: 1-5 degrees.
+                  Must be between 0 and 90.
+            is_tangent_chain: If True, automatically include faces that
+                             are tangent to selected faces. Default True.
+
+        Returns:
+            Dict containing:
+            - success: True if draft succeeded
+            - feature: Feature info with id and type
+            - draft: Operation details (faces, plane, angle)
+
+        Example:
+            # Add 3-degree draft to vertical faces of a box
+            box = await create_box(width=50, depth=50, height=30)
+            body = await get_body_by_id(
+                body_id=box["body"]["id"],
+                include_faces=True
+            )
+            # Select the vertical (side) faces
+            side_faces = [f["id"] for f in body["faces"]
+                         if f["face_type"] == "planar"]
+
+            result = await draft(
+                face_ids=side_faces,
+                plane="XY",  # Pull direction is Z axis
+                angle=3
+            )
+        """
+        logger.info(
+            "draft called",
+            face_ids=face_ids,
+            plane=plane,
+            angle=angle,
+            is_tangent_chain=is_tangent_chain,
+        )
+        async with FusionClient() as client:
+            return await client.draft(
+                face_ids=face_ids,
+                plane=plane,
+                angle=angle,
+                is_tangent_chain=is_tangent_chain,
+            )
+
+    @mcp.tool()
+    async def scale(
+        body_ids: list[str],
+        scale_factor: float = 1.0,
+        point_x: float = 0.0,
+        point_y: float = 0.0,
+        point_z: float = 0.0,
+        x_scale: float | None = None,
+        y_scale: float | None = None,
+        z_scale: float | None = None,
+    ) -> dict:
+        """Scale bodies uniformly or non-uniformly.
+
+        Scales one or more bodies about a point. Supports both uniform
+        scaling (same factor in all directions) and non-uniform scaling
+        (different factors per axis).
+
+        **Use this when**: Resizing parts, creating scaled variations,
+        or adjusting proportions.
+
+        **All positions in millimeters (mm). Scale factors are unitless.**
+
+        Args:
+            body_ids: List of body IDs to scale.
+            scale_factor: Uniform scale factor. Default 1.0 (no change).
+                         Values > 1 enlarge, < 1 shrink.
+                         Used when x_scale/y_scale/z_scale not provided.
+            point_x: Scale origin X in mm. Default 0.
+            point_y: Scale origin Y in mm. Default 0.
+            point_z: Scale origin Z in mm. Default 0.
+            x_scale: Non-uniform X scale factor. If provided, all three
+                    (x_scale, y_scale, z_scale) must be provided.
+            y_scale: Non-uniform Y scale factor.
+            z_scale: Non-uniform Z scale factor.
+
+        Returns:
+            Dict containing:
+            - success: True if scale succeeded
+            - feature: Feature info with id and type
+            - scale: Operation details (origin, factors, is_uniform)
+            - bodies: List of scaled body info
+
+        Example:
+            # Scale a body to double size
+            box = await create_box(width=50, depth=50, height=50)
+            result = await scale(
+                body_ids=[box["body"]["id"]],
+                scale_factor=2.0
+            )
+            # Body is now 100x100x100mm
+
+            # Non-uniform scale: make taller but narrower
+            result = await scale(
+                body_ids=["Body1"],
+                x_scale=0.5,
+                y_scale=0.5,
+                z_scale=2.0
+            )
+
+            # Scale about a specific point
+            result = await scale(
+                body_ids=["Body1"],
+                scale_factor=1.5,
+                point_x=50, point_y=50, point_z=0
+            )
+        """
+        logger.info(
+            "scale called",
+            body_ids=body_ids,
+            scale_factor=scale_factor,
+            point_x=point_x,
+            point_y=point_y,
+            point_z=point_z,
+            x_scale=x_scale,
+            y_scale=y_scale,
+            z_scale=z_scale,
+        )
+        async with FusionClient() as client:
+            return await client.scale(
+                body_ids=body_ids,
+                scale_factor=scale_factor,
+                point_x=point_x,
+                point_y=point_y,
+                point_z=point_z,
+                x_scale=x_scale,
+                y_scale=y_scale,
+                z_scale=z_scale,
+            )
+
+    @mcp.tool()
+    async def offset_face(
+        face_ids: list[str],
+        distance: float,
+    ) -> dict:
+        """Offset faces to add or remove material.
+
+        Moves selected faces perpendicular to themselves, adding or
+        removing material. Similar to Press/Pull in other CAD tools.
+        Useful for local modifications without recreating features.
+
+        **Use this when**: Adjusting wall thickness, creating pockets,
+        adding bosses, or making local modifications to existing geometry.
+
+        **Distance in millimeters (mm).**
+
+        Args:
+            face_ids: List of face IDs to offset.
+                     Get from get_body_by_id with include_faces=True.
+            distance: Offset distance in mm.
+                     Positive = move outward (add material)
+                     Negative = move inward (remove material)
+
+        Returns:
+            Dict containing:
+            - success: True if offset succeeded
+            - feature: Feature info with id and type
+            - offset: Operation details (faces, distance)
+
+        Example:
+            # Add 5mm to the top of a box (make it taller)
+            box = await create_box(width=100, depth=100, height=50)
+            body = await get_body_by_id(
+                body_id=box["body"]["id"],
+                include_faces=True
+            )
+            # Find top face
+            top_face_id = body["faces"][0]["id"]
+
+            result = await offset_face(
+                face_ids=[top_face_id],
+                distance=5  # Add 5mm height
+            )
+
+            # Create a shallow pocket by pushing a face inward
+            result = await offset_face(
+                face_ids=["Body1_face_0"],
+                distance=-2  # Remove 2mm
+            )
+        """
+        logger.info(
+            "offset_face called",
+            face_ids=face_ids,
+            distance=distance,
+        )
+        async with FusionClient() as client:
+            return await client.offset_face(
+                face_ids=face_ids,
+                distance=distance,
+            )
+
+    @mcp.tool()
+    async def split_face(
+        face_ids: list[str],
+        splitting_tool: str,
+        extend_splitting_tool: bool = True,
+    ) -> dict:
+        """Split faces using edges or curves.
+
+        Divides selected faces into multiple faces using a splitting
+        tool (edge, curve, or sketch). Useful for creating regions
+        on a face for different finishes, colors, or operations.
+
+        **Use this when**: Creating split lines for different materials,
+        preparing faces for partial operations, or defining regions.
+
+        Args:
+            face_ids: List of face IDs to split.
+                     Get from get_body_by_id with include_faces=True.
+            splitting_tool: Tool to split faces with:
+                - edge_id: An edge from another body
+                - curve_id: A sketch curve
+                - sketch_id: Use all curves from a sketch
+            extend_splitting_tool: If True, extend the splitting tool
+                to ensure complete split. Default True.
+
+        Returns:
+            Dict containing:
+            - success: True if split succeeded
+            - feature: Feature info with id and type
+            - split: Operation details (faces, tool)
+
+        Example:
+            # Split a face using a sketch line
+            box = await create_box(width=100, depth=100, height=20)
+            sketch = await create_sketch(plane="XY", offset=20)
+            await draw_line(
+                sketch_id=sketch["sketch"]["id"],
+                start_x=-60, start_y=0,
+                end_x=60, end_y=0
+            )
+
+            body = await get_body_by_id(
+                body_id=box["body"]["id"],
+                include_faces=True
+            )
+            top_face_id = body["faces"][0]["id"]
+
+            result = await split_face(
+                face_ids=[top_face_id],
+                splitting_tool=sketch["sketch"]["id"]
+            )
+            # Top face is now split into two faces
+        """
+        logger.info(
+            "split_face called",
+            face_ids=face_ids,
+            splitting_tool=splitting_tool,
+            extend_splitting_tool=extend_splitting_tool,
+        )
+        async with FusionClient() as client:
+            return await client.split_face(
+                face_ids=face_ids,
+                splitting_tool=splitting_tool,
+                extend_splitting_tool=extend_splitting_tool,
+            )

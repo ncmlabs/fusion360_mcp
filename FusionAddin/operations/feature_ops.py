@@ -2344,3 +2344,741 @@ def emboss(
             "For ENGRAVED features: Use extrude() with operation='cut' and direction='negative'"
         )
         raise FeatureError("emboss", workaround, fusion_error=str(e))
+
+
+# --- MODIFY Menu Tools ---
+
+
+# Map combine operation names to Fusion operation types
+COMBINE_OPERATION_MAP = {
+    "join": adsk.fusion.BooleanTypes.JoinBooleanType if FUSION_AVAILABLE else 0,
+    "cut": adsk.fusion.BooleanTypes.CutBooleanType if FUSION_AVAILABLE else 1,
+    "intersect": adsk.fusion.BooleanTypes.IntersectBooleanType if FUSION_AVAILABLE else 2,
+}
+
+
+def combine(
+    target_body_id: str,
+    tool_body_ids: List[str],
+    operation: str = "join",
+    keep_tools: bool = False,
+) -> Dict[str, Any]:
+    """Combine multiple bodies using boolean operations.
+
+    Args:
+        target_body_id: ID of the body to modify (target)
+        tool_body_ids: List of body IDs to combine with (tools)
+        operation: "join", "cut", or "intersect"
+        keep_tools: If True, keep tool bodies after operation
+
+    Returns:
+        Dict with feature info and resulting body
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If bodies not found
+        FeatureError: If combine fails
+    """
+    if operation not in COMBINE_OPERATION_MAP:
+        raise InvalidParameterError(
+            "operation", operation,
+            valid_values=list(COMBINE_OPERATION_MAP.keys())
+        )
+
+    if not tool_body_ids:
+        raise InvalidParameterError(
+            "tool_body_ids", tool_body_ids,
+            reason="At least one tool body ID is required"
+        )
+
+    design = _get_active_design()
+    registry = get_registry()
+
+    try:
+        # Get target body
+        target_body = _get_body(target_body_id)
+        component = target_body.parentComponent
+
+        # Collect tool bodies
+        tool_bodies = adsk.core.ObjectCollection.create()
+        for tool_id in tool_body_ids:
+            tool_body = _get_body(tool_id)
+            tool_bodies.add(tool_body)
+
+        # Create combine feature
+        combines = component.features.combineFeatures
+        combine_input = combines.createInput(target_body, tool_bodies)
+
+        # Set operation type
+        combine_input.operation = COMBINE_OPERATION_MAP[operation]
+
+        # Set whether to keep tool bodies
+        combine_input.isKeepToolBodies = keep_tools
+
+        # Create the combine
+        combine_feature = combines.add(combine_input)
+
+        if not combine_feature:
+            raise FeatureError("combine", "Combine operation failed")
+
+        # Register feature
+        feature_id = registry.register_feature(combine_feature)
+
+        # Get resulting body
+        body_serializer = BodySerializer(registry)
+        result_body = target_body  # Target body is modified in place
+        registry.register_body(result_body)
+
+        return {
+            "success": True,
+            "feature": {
+                "id": feature_id,
+                "type": "CombineFeature",
+            },
+            "combine": {
+                "target_body_id": target_body_id,
+                "tool_body_ids": tool_body_ids,
+                "operation": operation,
+                "keep_tools": keep_tools,
+            },
+            "body": body_serializer.serialize_summary(result_body),
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("combine", f"Failed to combine: {str(e)}", fusion_error=str(e))
+
+
+def split_body(
+    body_id: str,
+    splitting_tool: str,
+    extend_splitting_tool: bool = True,
+) -> Dict[str, Any]:
+    """Split a body using a plane or face.
+
+    Args:
+        body_id: ID of the body to split
+        splitting_tool: Face ID, plane ID, or "XY"/"YZ"/"XZ" for construction planes
+        extend_splitting_tool: If True, extend tool to fully split body
+
+    Returns:
+        Dict with feature info and resulting bodies
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If body or splitting tool not found
+        FeatureError: If split fails
+    """
+    design = _get_active_design()
+    registry = get_registry()
+
+    try:
+        # Get body to split
+        body = _get_body(body_id)
+        component = body.parentComponent
+
+        # Resolve splitting tool
+        splitting_entity = None
+        tool_upper = splitting_tool.upper() if len(splitting_tool) <= 2 else splitting_tool
+
+        if tool_upper == "XY":
+            splitting_entity = component.xYConstructionPlane
+        elif tool_upper == "YZ":
+            splitting_entity = component.yZConstructionPlane
+        elif tool_upper == "XZ":
+            splitting_entity = component.xZConstructionPlane
+        else:
+            # Try to get from registry (could be a face or construction plane)
+            splitting_entity = registry.get_sub_entity(splitting_tool)
+            if not splitting_entity:
+                # Try as a construction plane by name
+                for plane in component.constructionPlanes:
+                    if plane.name == splitting_tool:
+                        splitting_entity = plane
+                        break
+
+        if not splitting_entity:
+            raise EntityNotFoundError(
+                "SplittingTool", splitting_tool,
+                suggestion="Use 'XY', 'YZ', 'XZ', a face_id, or a construction plane name"
+            )
+
+        # Create split body feature
+        split_bodies = component.features.splitBodyFeatures
+        split_input = split_bodies.createInput(body, splitting_entity, extend_splitting_tool)
+
+        # Create the split
+        split_feature = split_bodies.add(split_input)
+
+        if not split_feature:
+            raise FeatureError("split_body", "Split body operation failed")
+
+        # Register feature
+        feature_id = registry.register_feature(split_feature)
+
+        # Get and register resulting bodies
+        body_serializer = BodySerializer(registry)
+        resulting_bodies = []
+        for i in range(split_feature.bodies.count):
+            result_body = split_feature.bodies.item(i)
+            registry.register_body(result_body)
+            resulting_bodies.append(body_serializer.serialize_summary(result_body))
+
+        return {
+            "success": True,
+            "feature": {
+                "id": feature_id,
+                "type": "SplitBodyFeature",
+            },
+            "split": {
+                "source_body_id": body_id,
+                "splitting_tool": splitting_tool,
+                "extend_splitting_tool": extend_splitting_tool,
+                "bodies_created": len(resulting_bodies),
+            },
+            "bodies": resulting_bodies,
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("split_body", f"Failed to split body: {str(e)}", fusion_error=str(e))
+
+
+def shell(
+    body_id: str,
+    face_ids: List[str],
+    thickness: float,
+    direction: str = "inside",
+) -> Dict[str, Any]:
+    """Create hollow shell by removing faces and adding wall thickness.
+
+    Args:
+        body_id: ID of the body to shell
+        face_ids: List of face IDs to remove (these become openings)
+        thickness: Wall thickness in mm
+        direction: "inside" (shell inward) or "outside" (shell outward)
+
+    Returns:
+        Dict with feature info and resulting body
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If body or faces not found
+        FeatureError: If shell fails
+    """
+    if thickness <= 0:
+        raise InvalidParameterError("thickness", thickness, min_value=0.001)
+
+    if direction not in ["inside", "outside"]:
+        raise InvalidParameterError("direction", direction, valid_values=["inside", "outside"])
+
+    if not face_ids:
+        raise InvalidParameterError("face_ids", face_ids, reason="At least one face ID is required")
+
+    design = _get_active_design()
+    registry = get_registry()
+
+    try:
+        # Get body
+        body = _get_body(body_id)
+        component = body.parentComponent
+
+        # Collect faces to remove
+        faces = adsk.core.ObjectCollection.create()
+        for face_id in face_ids:
+            face = registry.get_sub_entity(face_id)
+            if not face:
+                # Try to find by index
+                if "_face_" in face_id:
+                    try:
+                        idx = int(face_id.split("_face_")[1])
+                        if idx < body.faces.count:
+                            face = body.faces.item(idx)
+                    except (ValueError, IndexError):
+                        pass
+
+            if not face:
+                raise EntityNotFoundError(
+                    "Face", face_id,
+                    suggestion="Use get_body_by_id with include_faces=True to see available faces"
+                )
+            faces.add(face)
+
+        # Convert thickness to cm
+        thickness_cm = thickness / 10.0
+
+        # Create shell feature
+        shells = component.features.shellFeatures
+        shell_input = shells.createInput(faces, direction == "inside")
+
+        # Set thickness
+        shell_input.insideThickness = adsk.core.ValueInput.createByReal(thickness_cm)
+        if direction == "outside":
+            shell_input.outsideThickness = adsk.core.ValueInput.createByReal(thickness_cm)
+            shell_input.insideThickness = adsk.core.ValueInput.createByReal(0)
+
+        # Create the shell
+        shell_feature = shells.add(shell_input)
+
+        if not shell_feature:
+            raise FeatureError("shell", "Shell operation failed")
+
+        # Register feature
+        feature_id = registry.register_feature(shell_feature)
+
+        # Get resulting body
+        body_serializer = BodySerializer(registry)
+        registry.register_body(body)
+
+        return {
+            "success": True,
+            "feature": {
+                "id": feature_id,
+                "type": "ShellFeature",
+            },
+            "shell": {
+                "body_id": body_id,
+                "removed_faces": face_ids,
+                "thickness": thickness,
+                "direction": direction,
+            },
+            "body": body_serializer.serialize_summary(body),
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("shell", f"Failed to create shell: {str(e)}", fusion_error=str(e))
+
+
+def draft(
+    face_ids: List[str],
+    plane: str,
+    angle: float,
+    is_tangent_chain: bool = True,
+) -> Dict[str, Any]:
+    """Add draft angle to faces for mold release.
+
+    Args:
+        face_ids: List of face IDs to draft
+        plane: Pull direction plane (face_id or "XY"/"YZ"/"XZ")
+        angle: Draft angle in degrees
+        is_tangent_chain: If True, include tangent-connected faces
+
+    Returns:
+        Dict with feature info
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If faces or plane not found
+        FeatureError: If draft fails
+    """
+    if angle <= 0 or angle >= 90:
+        raise InvalidParameterError("angle", angle, min_value=0.001, max_value=89.999)
+
+    if not face_ids:
+        raise InvalidParameterError("face_ids", face_ids, reason="At least one face ID is required")
+
+    design = _get_active_design()
+    registry = get_registry()
+
+    try:
+        # Get first face to determine component
+        first_face = registry.get_sub_entity(face_ids[0])
+        if not first_face:
+            raise EntityNotFoundError("Face", face_ids[0])
+
+        component = first_face.body.parentComponent
+
+        # Collect faces
+        faces = adsk.core.ObjectCollection.create()
+        for face_id in face_ids:
+            face = registry.get_sub_entity(face_id)
+            if not face:
+                raise EntityNotFoundError(
+                    "Face", face_id,
+                    suggestion="Use get_body_by_id with include_faces=True"
+                )
+            faces.add(face)
+
+        # Resolve plane (pull direction)
+        plane_entity = None
+        plane_upper = plane.upper() if len(plane) <= 2 else plane
+
+        if plane_upper == "XY":
+            plane_entity = component.xYConstructionPlane
+        elif plane_upper == "YZ":
+            plane_entity = component.yZConstructionPlane
+        elif plane_upper == "XZ":
+            plane_entity = component.xZConstructionPlane
+        else:
+            # Try to get as face or plane from registry
+            plane_entity = registry.get_sub_entity(plane)
+            if not plane_entity:
+                for cp in component.constructionPlanes:
+                    if cp.name == plane:
+                        plane_entity = cp
+                        break
+
+        if not plane_entity:
+            raise EntityNotFoundError(
+                "Plane", plane,
+                suggestion="Use 'XY', 'YZ', 'XZ', a face_id, or a construction plane name"
+            )
+
+        # Convert angle to radians
+        angle_rad = math.radians(angle)
+
+        # Create draft feature
+        drafts = component.features.draftFeatures
+        draft_input = drafts.createInput(
+            faces,
+            plane_entity,
+            adsk.core.ValueInput.createByReal(angle_rad),
+            is_tangent_chain
+        )
+
+        # Create the draft
+        draft_feature = drafts.add(draft_input)
+
+        if not draft_feature:
+            raise FeatureError("draft", "Draft operation failed")
+
+        # Register feature
+        feature_id = registry.register_feature(draft_feature)
+
+        return {
+            "success": True,
+            "feature": {
+                "id": feature_id,
+                "type": "DraftFeature",
+            },
+            "draft": {
+                "face_ids": face_ids,
+                "plane": plane,
+                "angle": angle,
+                "is_tangent_chain": is_tangent_chain,
+            },
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("draft", f"Failed to create draft: {str(e)}", fusion_error=str(e))
+
+
+def scale(
+    body_ids: List[str],
+    scale_factor: float = 1.0,
+    point_x: float = 0.0,
+    point_y: float = 0.0,
+    point_z: float = 0.0,
+    x_scale: Optional[float] = None,
+    y_scale: Optional[float] = None,
+    z_scale: Optional[float] = None,
+) -> Dict[str, Any]:
+    """Scale bodies uniformly or non-uniformly.
+
+    Args:
+        body_ids: List of body IDs to scale
+        scale_factor: Uniform scale factor (used if x/y/z_scale not provided)
+        point_x: Scale origin X in mm
+        point_y: Scale origin Y in mm
+        point_z: Scale origin Z in mm
+        x_scale: Non-uniform X scale factor (overrides scale_factor)
+        y_scale: Non-uniform Y scale factor (overrides scale_factor)
+        z_scale: Non-uniform Z scale factor (overrides scale_factor)
+
+    Returns:
+        Dict with feature info and scaled bodies
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If bodies not found
+        FeatureError: If scale fails
+    """
+    # Determine if uniform or non-uniform
+    is_non_uniform = any(s is not None for s in [x_scale, y_scale, z_scale])
+
+    if is_non_uniform:
+        # All three must be provided for non-uniform
+        if x_scale is None or y_scale is None or z_scale is None:
+            raise InvalidParameterError(
+                "x_scale/y_scale/z_scale", [x_scale, y_scale, z_scale],
+                reason="For non-uniform scaling, all three (x_scale, y_scale, z_scale) must be provided"
+            )
+        if x_scale <= 0 or y_scale <= 0 or z_scale <= 0:
+            raise InvalidParameterError(
+                "scale factors", [x_scale, y_scale, z_scale],
+                reason="Scale factors must be positive"
+            )
+    else:
+        if scale_factor <= 0:
+            raise InvalidParameterError("scale_factor", scale_factor, min_value=0.001)
+
+    if not body_ids:
+        raise InvalidParameterError("body_ids", body_ids, reason="At least one body ID is required")
+
+    design = _get_active_design()
+    registry = get_registry()
+
+    try:
+        # Collect bodies
+        bodies = adsk.core.ObjectCollection.create()
+        component = None
+
+        for body_id in body_ids:
+            body = _get_body(body_id)
+            bodies.add(body)
+            if component is None:
+                component = body.parentComponent
+
+        if component is None:
+            component = design.rootComponent
+
+        # Create scale point (in cm)
+        point_cm = adsk.core.Point3D.create(point_x / 10.0, point_y / 10.0, point_z / 10.0)
+
+        # Create scale feature
+        scales = component.features.scaleFeatures
+        scale_input = scales.createInput(bodies, point_cm, adsk.core.ValueInput.createByReal(scale_factor))
+
+        if is_non_uniform:
+            # Set non-uniform scaling
+            scale_input.setToNonUniform(
+                adsk.core.ValueInput.createByReal(x_scale),
+                adsk.core.ValueInput.createByReal(y_scale),
+                adsk.core.ValueInput.createByReal(z_scale)
+            )
+
+        # Create the scale
+        scale_feature = scales.add(scale_input)
+
+        if not scale_feature:
+            raise FeatureError("scale", "Scale operation failed")
+
+        # Register feature
+        feature_id = registry.register_feature(scale_feature)
+
+        # Get scaled bodies
+        body_serializer = BodySerializer(registry)
+        scaled_bodies = []
+        for i in range(scale_feature.bodies.count):
+            scaled_body = scale_feature.bodies.item(i)
+            registry.register_body(scaled_body)
+            scaled_bodies.append(body_serializer.serialize_summary(scaled_body))
+
+        result = {
+            "success": True,
+            "feature": {
+                "id": feature_id,
+                "type": "ScaleFeature",
+            },
+            "scale": {
+                "body_ids": body_ids,
+                "origin": {"x": point_x, "y": point_y, "z": point_z},
+                "is_uniform": not is_non_uniform,
+            },
+            "bodies": scaled_bodies,
+        }
+
+        if is_non_uniform:
+            result["scale"]["x_scale"] = x_scale
+            result["scale"]["y_scale"] = y_scale
+            result["scale"]["z_scale"] = z_scale
+        else:
+            result["scale"]["scale_factor"] = scale_factor
+
+        return result
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("scale", f"Failed to scale: {str(e)}", fusion_error=str(e))
+
+
+def offset_face(
+    face_ids: List[str],
+    distance: float,
+) -> Dict[str, Any]:
+    """Offset faces to add or remove material (Press Pull for faces).
+
+    Args:
+        face_ids: List of face IDs to offset
+        distance: Offset distance in mm (positive = outward, negative = inward)
+
+    Returns:
+        Dict with feature info
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If faces not found
+        FeatureError: If offset fails
+    """
+    if distance == 0:
+        raise InvalidParameterError("distance", distance, reason="Distance must be non-zero")
+
+    if not face_ids:
+        raise InvalidParameterError("face_ids", face_ids, reason="At least one face ID is required")
+
+    design = _get_active_design()
+    registry = get_registry()
+
+    try:
+        # Collect faces
+        faces = adsk.core.ObjectCollection.create()
+        component = None
+
+        for face_id in face_ids:
+            face = registry.get_sub_entity(face_id)
+            if not face:
+                raise EntityNotFoundError(
+                    "Face", face_id,
+                    suggestion="Use get_body_by_id with include_faces=True"
+                )
+            faces.add(face)
+            if component is None:
+                component = face.body.parentComponent
+
+        if component is None:
+            component = design.rootComponent
+
+        # Convert distance to cm
+        distance_cm = distance / 10.0
+
+        # Create offset faces feature
+        offset_faces = component.features.offsetFacesFeatures
+        offset_input = offset_faces.createInput(
+            faces,
+            adsk.core.ValueInput.createByReal(distance_cm)
+        )
+
+        # Create the offset
+        offset_feature = offset_faces.add(offset_input)
+
+        if not offset_feature:
+            raise FeatureError("offset_face", "Offset face operation failed")
+
+        # Register feature
+        feature_id = registry.register_feature(offset_feature)
+
+        return {
+            "success": True,
+            "feature": {
+                "id": feature_id,
+                "type": "OffsetFacesFeature",
+            },
+            "offset": {
+                "face_ids": face_ids,
+                "distance": distance,
+            },
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("offset_face", f"Failed to offset faces: {str(e)}", fusion_error=str(e))
+
+
+def split_face(
+    face_ids: List[str],
+    splitting_tool: str,
+    extend_splitting_tool: bool = True,
+) -> Dict[str, Any]:
+    """Split faces using edges or curves.
+
+    Args:
+        face_ids: List of face IDs to split
+        splitting_tool: Edge ID, curve ID, or sketch ID to split with
+        extend_splitting_tool: If True, extend tool to fully split faces
+
+    Returns:
+        Dict with feature info and resulting faces
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If faces or tool not found
+        FeatureError: If split fails
+    """
+    if not face_ids:
+        raise InvalidParameterError("face_ids", face_ids, reason="At least one face ID is required")
+
+    design = _get_active_design()
+    registry = get_registry()
+
+    try:
+        # Collect faces
+        faces = adsk.core.ObjectCollection.create()
+        component = None
+
+        for face_id in face_ids:
+            face = registry.get_sub_entity(face_id)
+            if not face:
+                raise EntityNotFoundError(
+                    "Face", face_id,
+                    suggestion="Use get_body_by_id with include_faces=True"
+                )
+            faces.add(face)
+            if component is None:
+                component = face.body.parentComponent
+
+        if component is None:
+            component = design.rootComponent
+
+        # Resolve splitting tool (could be edge, sketch curve, or sketch)
+        splitting_entity = registry.get_sub_entity(splitting_tool)
+
+        if not splitting_entity:
+            # Try as a sketch
+            sketch = registry.get_sketch(splitting_tool)
+            if sketch:
+                # Use all curves from the sketch
+                curves = adsk.core.ObjectCollection.create()
+                for i in range(sketch.sketchCurves.count):
+                    curves.add(sketch.sketchCurves.item(i))
+                splitting_entity = curves
+            else:
+                raise EntityNotFoundError(
+                    "SplittingTool", splitting_tool,
+                    suggestion="Use an edge_id, sketch curve_id, or sketch_id"
+                )
+
+        # Create split face feature
+        split_faces = component.features.splitFaceFeatures
+
+        # Determine the type of splitting tool
+        if isinstance(splitting_entity, adsk.core.ObjectCollection):
+            # Multiple curves from a sketch
+            split_input = split_faces.createInput(faces, splitting_entity, extend_splitting_tool)
+        else:
+            # Single entity (edge or curve)
+            split_input = split_faces.createInput(faces, splitting_entity, extend_splitting_tool)
+
+        # Create the split
+        split_feature = split_faces.add(split_input)
+
+        if not split_feature:
+            raise FeatureError("split_face", "Split face operation failed")
+
+        # Register feature
+        feature_id = registry.register_feature(split_feature)
+
+        return {
+            "success": True,
+            "feature": {
+                "id": feature_id,
+                "type": "SplitFaceFeature",
+            },
+            "split": {
+                "face_ids": face_ids,
+                "splitting_tool": splitting_tool,
+                "extend_splitting_tool": extend_splitting_tool,
+            },
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("split_face", f"Failed to split faces: {str(e)}", fusion_error=str(e))

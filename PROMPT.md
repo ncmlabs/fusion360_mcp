@@ -94,7 +94,7 @@ This guide helps LLMs quickly identify the right tools and workflows when workin
 | `create_thread(face_id, thread_type, thread_size, ...)` | Add threads | Cylindrical face |
 | `create_coil(...)` | **NOT SUPPORTED** | Use sweep workaround |
 
-### Modification Tools (7 tools)
+### Modification Tools (14 tools)
 | Tool | Purpose | Key Parameters |
 |------|---------|----------------|
 | `move_body(body_id, x?, y?, z?)` | Translate body | Offset in mm |
@@ -104,6 +104,13 @@ This guide helps LLMs quickly identify the right tools and workflows when workin
 | `delete_body(body_id)` | Remove body | Creates Remove feature |
 | `delete_feature(feature_id)` | Remove from timeline | May affect dependents |
 | `edit_sketch(sketch_id, curve_id, properties)` | Modify curve | {"radius": 25} |
+| `combine(target_body_id, tool_body_ids, operation?, keep_tools?)` | Boolean combine | "join", "cut", "intersect" |
+| `split_body(body_id, splitting_tool, extend?)` | Split into parts | "XY"/"YZ"/"XZ" or face_id |
+| `shell(body_id, face_ids, thickness, direction?)` | Create hollow shell | Remove faces, add walls |
+| `draft(face_ids, plane, angle, is_tangent_chain?)` | Add draft angle | For mold release |
+| `scale(body_ids, scale_factor?, point_x/y/z?, x/y/z_scale?)` | Scale bodies | Uniform or non-uniform |
+| `offset_face(face_ids, distance)` | Push/pull faces | + outward, - inward |
+| `split_face(face_ids, splitting_tool, extend?)` | Split faces | Edge or sketch curve |
 
 ### Validation Tools (5 tools)
 | Tool | Purpose | Key Parameters |
@@ -187,7 +194,14 @@ What is your goal?
 │   ├── Round edges → fillet()
 │   ├── Bevel edges → chamfer()
 │   ├── Change dimension → modify_feature() or update_parameter()
-│   └── Delete → delete_body() or delete_feature()
+│   ├── Delete → delete_body() or delete_feature()
+│   ├── Boolean combine bodies → combine() with "join"/"cut"/"intersect"
+│   ├── Split body in half → split_body()
+│   ├── Make hollow shell → shell()
+│   ├── Add mold draft → draft()
+│   ├── Resize/scale → scale()
+│   ├── Push/pull faces → offset_face()
+│   └── Split face → split_face()
 │
 ├── [Validate design]
 │   ├── Check spacing → measure_distance()
