@@ -52,6 +52,10 @@ from operations.feature_ops import (
     rectangular_pattern,
     circular_pattern,
     mirror_feature,
+    # Phase 8c: Specialized Feature Tools
+    create_thread,
+    thicken,
+    emboss,
 )
 from shared.exceptions import InvalidParameterError
 
@@ -1458,4 +1462,111 @@ def handle_mirror_feature(args: Dict[str, Any]) -> Dict[str, Any]:
         entity_ids=args["entity_ids"],
         entity_type=args["entity_type"],
         mirror_plane=args["mirror_plane"],
+    )
+
+
+# --- Phase 8c: Specialized Feature Handlers ---
+
+
+def handle_create_thread(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle create_thread request.
+
+    Adds threads to a cylindrical face.
+
+    Args:
+        args: Request arguments
+            - face_id: ID of the cylindrical face to add thread to (required)
+            - thread_type: Thread standard e.g. "ISO Metric profile" (required)
+            - thread_size: Thread designation e.g. "M6x1" (required)
+            - is_internal: Internal thread (default False)
+            - is_full_length: Thread entire face length (default True)
+            - thread_length: Custom thread length in mm (optional)
+            - is_modeled: Create physical thread geometry (default False)
+
+    Returns:
+        Dict with thread feature info
+    """
+    if "face_id" not in args:
+        raise InvalidParameterError("face_id", None, reason="face_id is required")
+    if "thread_type" not in args:
+        raise InvalidParameterError("thread_type", None, reason="thread_type is required")
+    if "thread_size" not in args:
+        raise InvalidParameterError("thread_size", None, reason="thread_size is required")
+
+    return create_thread(
+        face_id=args["face_id"],
+        thread_type=args["thread_type"],
+        thread_size=args["thread_size"],
+        is_internal=bool(args.get("is_internal", False)),
+        is_full_length=bool(args.get("is_full_length", True)),
+        thread_length=float(args["thread_length"]) if "thread_length" in args else None,
+        is_modeled=bool(args.get("is_modeled", False)),
+    )
+
+
+def handle_thicken(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle thicken request.
+
+    Adds thickness to surface faces to create solid bodies.
+
+    Args:
+        args: Request arguments
+            - face_ids: List of face IDs to thicken (required)
+            - thickness: Thickness in mm (required)
+            - direction: "positive", "negative", or "both" (default both)
+            - operation: "new_body", "join", "cut", "intersect" (default new_body)
+            - is_chain: Include tangent-connected faces (default True)
+
+    Returns:
+        Dict with thicken feature info and created bodies
+    """
+    if "face_ids" not in args:
+        raise InvalidParameterError("face_ids", None, reason="face_ids is required")
+    if "thickness" not in args:
+        raise InvalidParameterError("thickness", None, reason="thickness is required")
+
+    face_ids = args["face_ids"]
+    if isinstance(face_ids, str):
+        face_ids = [face_ids]
+
+    return thicken(
+        face_ids=face_ids,
+        thickness=float(args["thickness"]),
+        direction=args.get("direction", "both"),
+        operation=args.get("operation", "new_body"),
+        is_chain=bool(args.get("is_chain", True)),
+    )
+
+
+def handle_emboss(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle emboss request.
+
+    Creates raised (emboss) or recessed (deboss) features from sketch profiles.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the sketch containing profile/text (required)
+            - face_id: ID of the face to emboss onto (required)
+            - depth: Emboss/deboss depth in mm (required)
+            - is_emboss: Emboss (True) or deboss (False) (default True)
+            - profile_index: Index of profile to use (default 0)
+            - taper_angle: Side taper angle in degrees (default 0)
+
+    Returns:
+        Dict with emboss feature info
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "face_id" not in args:
+        raise InvalidParameterError("face_id", None, reason="face_id is required")
+    if "depth" not in args:
+        raise InvalidParameterError("depth", None, reason="depth is required")
+
+    return emboss(
+        sketch_id=args["sketch_id"],
+        face_id=args["face_id"],
+        depth=float(args["depth"]),
+        is_emboss=bool(args.get("is_emboss", True)),
+        profile_index=int(args.get("profile_index", 0)),
+        taper_angle=float(args.get("taper_angle", 0)),
     )

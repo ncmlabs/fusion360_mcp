@@ -1859,3 +1859,406 @@ def create_hole(
         if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
             raise
         raise FeatureError("hole", f"Failed to create hole: {str(e)}", fusion_error=str(e))
+
+
+# --- Phase 8c: Specialized Feature Tools ---
+
+
+def create_thread(
+    face_id: str,
+    thread_type: str,
+    thread_size: str,
+    is_internal: bool = False,
+    is_full_length: bool = True,
+    thread_length: Optional[float] = None,
+    is_modeled: bool = False,
+) -> Dict[str, Any]:
+    """Add threads to a cylindrical face.
+
+    Args:
+        face_id: ID of the cylindrical face to add thread to
+        thread_type: Thread standard (e.g., "ISO Metric profile")
+        thread_size: Thread designation (e.g., "M6x1", "M8x1.25")
+        is_internal: Internal thread (True) or external thread (False)
+        is_full_length: Thread entire face length (True) or use custom length
+        thread_length: Custom thread length in mm (used if is_full_length=False)
+        is_modeled: Create physical thread geometry (slower but visible)
+
+    Returns:
+        Dict with thread feature info and thread specification
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If face not found
+        FeatureError: If thread creation fails
+    """
+    if not thread_type:
+        raise InvalidParameterError("thread_type", thread_type, reason="Thread type is required")
+    if not thread_size:
+        raise InvalidParameterError("thread_size", thread_size, reason="Thread size is required")
+    if not is_full_length and (thread_length is None or thread_length <= 0):
+        raise InvalidParameterError(
+            "thread_length", thread_length,
+            reason="thread_length is required when is_full_length=False"
+        )
+
+    design = _get_active_design()
+    registry = get_registry()
+
+    try:
+        # Get the face
+        face = registry.get_sub_entity(face_id)
+        if not face:
+            raise EntityNotFoundError("Face", face_id, suggestion="Use get_body_by_id with include_faces=True")
+
+        # Verify face is cylindrical
+        if not hasattr(face, 'geometry') or face.geometry.surfaceType != adsk.core.SurfaceTypes.CylinderSurfaceType:
+            raise InvalidParameterError(
+                "face_id", face_id,
+                reason="Face must be cylindrical for threading. Use a cylindrical face from a hole or shaft."
+            )
+
+        # Get component
+        body = face.body
+        component = body.parentComponent
+
+        # Get thread data
+        thread_data = component.features.threadFeatures.threadDataQuery
+
+        # Find matching thread type
+        all_thread_types = thread_data.allThreadTypes
+        matching_type = None
+        for t_type in all_thread_types:
+            if thread_type.lower() in t_type.lower():
+                matching_type = t_type
+                break
+
+        if not matching_type:
+            available_types = list(all_thread_types)[:10]
+            raise InvalidParameterError(
+                "thread_type", thread_type,
+                reason=f"Thread type not found. Available types include: {available_types}"
+            )
+
+        # Get available sizes for this thread type
+        all_sizes = thread_data.allSizes(matching_type)
+        matching_size = None
+        for size in all_sizes:
+            if thread_size.lower() in size.lower() or size.lower() in thread_size.lower():
+                matching_size = size
+                break
+
+        if not matching_size:
+            available_sizes = list(all_sizes)[:10]
+            raise InvalidParameterError(
+                "thread_size", thread_size,
+                reason=f"Thread size not found for {matching_type}. Available sizes include: {available_sizes}"
+            )
+
+        # Get default thread designation
+        all_designations = thread_data.allDesignations(matching_type, matching_size)
+        if len(all_designations) == 0:
+            raise FeatureError(
+                "thread",
+                f"No thread designations found for {matching_type} {matching_size}"
+            )
+
+        thread_designation = all_designations[0]
+
+        # Get thread info for the response
+        thread_class = thread_data.defaultClass(is_internal, matching_type, thread_designation)
+        pitch_str = thread_data.pitch(matching_type, matching_size, thread_designation)
+
+        # Build thread info object
+        thread_info = adsk.fusion.ThreadInfo.create(
+            face,
+            matching_type,
+            thread_designation,
+            thread_class
+        )
+        thread_info.isRightHand = True
+
+        # Create thread input
+        threads = component.features.threadFeatures
+        thread_input = threads.createInput(face, thread_info)
+
+        # Set thread options
+        thread_input.isModeled = is_modeled
+
+        if is_full_length:
+            thread_input.isFullLength = True
+        else:
+            thread_input.isFullLength = False
+            thread_length_cm = thread_length / 10.0
+            thread_input.threadLength = adsk.core.ValueInput.createByReal(thread_length_cm)
+
+        # Create the thread
+        thread_feature = threads.add(thread_input)
+
+        if not thread_feature:
+            raise FeatureError("thread", "Thread creation failed")
+
+        # Register feature
+        feature_id = registry.register_feature(thread_feature)
+
+        return {
+            "success": True,
+            "feature": {
+                "id": feature_id,
+                "type": "ThreadFeature",
+            },
+            "thread": {
+                "thread_type": matching_type,
+                "thread_size": matching_size,
+                "thread_designation": thread_designation,
+                "thread_class": thread_class,
+                "pitch": pitch_str,
+                "is_internal": is_internal,
+                "is_full_length": is_full_length,
+                "is_modeled": is_modeled,
+                "is_right_hand": True,
+            },
+            "face_id": face_id,
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("thread", f"Failed to create thread: {str(e)}", fusion_error=str(e))
+
+
+def thicken(
+    face_ids: List[str],
+    thickness: float,
+    direction: str = "both",
+    operation: str = "new_body",
+    is_chain: bool = True,
+) -> Dict[str, Any]:
+    """Add thickness to surface faces to create solid bodies.
+
+    Args:
+        face_ids: List of face IDs to thicken
+        thickness: Thickness in mm
+        direction: "positive", "negative", or "both"
+        operation: "new_body", "join", "cut", "intersect"
+        is_chain: Include tangent-connected faces
+
+    Returns:
+        Dict with thicken feature info and created bodies
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If faces not found
+        FeatureError: If thicken fails
+    """
+    if thickness <= 0:
+        raise InvalidParameterError("thickness", thickness, min_value=0.001)
+
+    if direction not in ["positive", "negative", "both"]:
+        raise InvalidParameterError("direction", direction, valid_values=["positive", "negative", "both"])
+
+    if operation not in OPERATION_MAP:
+        raise InvalidParameterError("operation", operation, valid_values=list(OPERATION_MAP.keys()))
+
+    if not face_ids:
+        raise InvalidParameterError("face_ids", face_ids, reason="At least one face ID required")
+
+    design = _get_active_design()
+    registry = get_registry()
+
+    try:
+        # Collect faces
+        faces = adsk.core.ObjectCollection.create()
+        component = None
+
+        for face_id in face_ids:
+            face = registry.get_sub_entity(face_id)
+            if not face:
+                raise EntityNotFoundError("Face", face_id, suggestion="Use get_body_by_id with include_faces=True")
+
+            faces.add(face)
+            if component is None:
+                component = face.body.parentComponent
+
+        if component is None:
+            component = design.rootComponent
+
+        # Convert thickness to cm
+        thickness_cm = thickness / 10.0
+
+        # Create thicken input
+        thickens = component.features.thickenFeatures
+        thicken_input = thickens.createInput(faces, adsk.core.ValueInput.createByReal(thickness_cm), True)
+
+        # Set direction
+        if direction == "positive":
+            thicken_input.isSymmetric = False
+            # Default is positive (outward)
+        elif direction == "negative":
+            thicken_input.isSymmetric = False
+            thicken_input.thickness = adsk.core.ValueInput.createByReal(-thickness_cm)
+        else:  # both
+            thicken_input.isSymmetric = True
+
+        # Set operation
+        thicken_input.operation = OPERATION_MAP[operation]
+
+        # Set chaining
+        thicken_input.isChainSelection = is_chain
+
+        # Create the thicken
+        thicken_feature = thickens.add(thicken_input)
+
+        if not thicken_feature:
+            raise FeatureError("thicken", "Thicken operation failed")
+
+        # Register feature
+        feature_id = registry.register_feature(thicken_feature)
+
+        # Get and register created bodies
+        created_bodies = []
+        body_serializer = BodySerializer(registry)
+
+        for i in range(thicken_feature.bodies.count):
+            body = thicken_feature.bodies.item(i)
+            registry.register_body(body)
+            created_bodies.append(body_serializer.serialize_summary(body))
+
+        return {
+            "success": True,
+            "feature": {
+                "id": feature_id,
+                "type": "ThickenFeature",
+            },
+            "thicken": {
+                "thickness": thickness,
+                "direction": direction,
+                "operation": operation,
+                "is_chain": is_chain,
+                "source_faces": len(face_ids),
+            },
+            "bodies": created_bodies,
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("thicken", f"Failed to thicken: {str(e)}", fusion_error=str(e))
+
+
+def emboss(
+    sketch_id: str,
+    face_id: str,
+    depth: float,
+    is_emboss: bool = True,
+    profile_index: int = 0,
+    taper_angle: float = 0.0,
+) -> Dict[str, Any]:
+    """Create raised (emboss) or recessed (deboss) features from sketch profiles.
+
+    Args:
+        sketch_id: ID of the sketch containing profile/text to emboss
+        face_id: ID of the face to emboss onto
+        depth: Emboss/deboss depth in mm
+        is_emboss: True for raised (emboss), False for recessed (deboss/engrave)
+        profile_index: Index of profile to use from sketch
+        taper_angle: Side taper angle in degrees
+
+    Returns:
+        Dict with emboss feature info
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If sketch or face not found
+        FeatureError: If emboss fails
+    """
+    if depth <= 0:
+        raise InvalidParameterError("depth", depth, min_value=0.001)
+
+    if taper_angle < 0 or taper_angle >= 90:
+        raise InvalidParameterError("taper_angle", taper_angle, min_value=0, max_value=89.99)
+
+    sketch, component = _get_sketch(sketch_id)
+    registry = get_registry()
+
+    # Check for profiles
+    if sketch.profiles.count == 0:
+        raise FeatureError(
+            "emboss",
+            "Sketch has no closed profiles to emboss. Add text or closed curves to the sketch.",
+            affected_entities=[sketch_id]
+        )
+
+    if profile_index >= sketch.profiles.count:
+        raise InvalidParameterError(
+            "profile_index",
+            profile_index,
+            max_value=sketch.profiles.count - 1,
+            reason=f"Sketch has only {sketch.profiles.count} profiles"
+        )
+
+    try:
+        # Get the face
+        face = registry.get_sub_entity(face_id)
+        if not face:
+            raise EntityNotFoundError("Face", face_id, suggestion="Use get_body_by_id with include_faces=True")
+
+        # Get the profile
+        profile = sketch.profiles.item(profile_index)
+
+        # Convert depth to cm
+        depth_cm = depth / 10.0
+
+        # Create emboss input
+        embosses = component.features.embossFeatures
+        emboss_input = embosses.createInput(
+            profile,
+            face,
+            adsk.core.ValueInput.createByReal(depth_cm)
+        )
+
+        # Set emboss type
+        if is_emboss:
+            emboss_input.embossType = adsk.fusion.EmbossTypes.EmbossEmbossType
+        else:
+            emboss_input.embossType = adsk.fusion.EmbossTypes.EngraveEmbossType
+
+        # Set taper angle if specified
+        if abs(taper_angle) > 0.001:
+            taper_rad = math.radians(taper_angle)
+            emboss_input.taperAngle = adsk.core.ValueInput.createByReal(taper_rad)
+
+        # Create the emboss
+        emboss_feature = embosses.add(emboss_input)
+
+        if not emboss_feature:
+            raise FeatureError("emboss", "Emboss operation failed")
+
+        # Register feature
+        feature_id = registry.register_feature(emboss_feature)
+
+        # Get affected body
+        body = face.body
+        body_id = registry.register_body(body)
+
+        return {
+            "success": True,
+            "feature": {
+                "id": feature_id,
+                "type": "EmbossFeature",
+            },
+            "emboss": {
+                "type": "emboss" if is_emboss else "deboss",
+                "depth": depth,
+                "taper_angle": taper_angle,
+                "profile_index": profile_index,
+                "sketch_id": sketch_id,
+                "face_id": face_id,
+            },
+            "body_id": body_id,
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError("emboss", f"Failed to emboss: {str(e)}", fusion_error=str(e))

@@ -1847,3 +1847,100 @@ class FusionClient:
             "entity_type": entity_type,
             "mirror_plane": mirror_plane,
         })
+
+    # --- Phase 8c: Specialized Feature Methods ---
+
+    async def create_thread(
+        self,
+        face_id: str,
+        thread_type: str,
+        thread_size: str,
+        is_internal: bool = False,
+        is_full_length: bool = True,
+        thread_length: Optional[float] = None,
+        is_modeled: bool = False,
+    ) -> Dict[str, Any]:
+        """Add threads to a cylindrical face.
+
+        Args:
+            face_id: ID of the cylindrical face to add thread to
+            thread_type: Thread standard (e.g., "ISO Metric profile")
+            thread_size: Thread designation (e.g., "M6x1", "M8x1.25")
+            is_internal: Internal thread (True) or external thread (False)
+            is_full_length: Thread entire face length (True) or use custom length
+            thread_length: Custom thread length in mm (used if is_full_length=False)
+            is_modeled: Create physical thread geometry (slower but visible)
+
+        Returns:
+            Dict with thread feature info and thread specification
+        """
+        data: Dict[str, Any] = {
+            "face_id": face_id,
+            "thread_type": thread_type,
+            "thread_size": thread_size,
+            "is_internal": is_internal,
+            "is_full_length": is_full_length,
+            "is_modeled": is_modeled,
+        }
+        if thread_length is not None:
+            data["thread_length"] = thread_length
+        return await self._request("POST", "/create/thread", data)
+
+    async def thicken(
+        self,
+        face_ids: List[str],
+        thickness: float,
+        direction: str = "both",
+        operation: str = "new_body",
+        is_chain: bool = True,
+    ) -> Dict[str, Any]:
+        """Add thickness to surface faces to create solid bodies.
+
+        Args:
+            face_ids: List of face IDs to thicken
+            thickness: Thickness in mm
+            direction: "positive", "negative", or "both"
+            operation: "new_body", "join", "cut", "intersect"
+            is_chain: Include tangent-connected faces
+
+        Returns:
+            Dict with thicken feature info and created bodies
+        """
+        return await self._request("POST", "/create/thicken", {
+            "face_ids": face_ids,
+            "thickness": thickness,
+            "direction": direction,
+            "operation": operation,
+            "is_chain": is_chain,
+        })
+
+    async def emboss(
+        self,
+        sketch_id: str,
+        face_id: str,
+        depth: float,
+        is_emboss: bool = True,
+        profile_index: int = 0,
+        taper_angle: float = 0.0,
+    ) -> Dict[str, Any]:
+        """Create raised (emboss) or recessed (deboss) features from sketch profiles.
+
+        Args:
+            sketch_id: ID of the sketch containing profile/text to emboss
+            face_id: ID of the face to emboss onto
+            depth: Emboss/deboss depth in mm
+            is_emboss: True for emboss, False for deboss/engrave
+            profile_index: Index of profile to use from sketch
+            taper_angle: Side taper angle in degrees
+
+        Returns:
+            Dict with emboss feature info
+        """
+        return await self._request("POST", "/create/emboss", {
+            "sketch_id": sketch_id,
+            "face_id": face_id,
+            "depth": depth,
+            "is_emboss": is_emboss,
+            "profile_index": profile_index,
+            "taper_angle": taper_angle,
+        })
