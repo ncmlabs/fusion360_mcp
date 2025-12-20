@@ -3013,4 +3013,248 @@ def register_creation_tools(mcp: FastMCP) -> None:
                 taper_angle=taper_angle,
             )
 
+    # --- Construction Plane Creation Tools ---
+
+    @mcp.tool()
+    async def create_offset_plane(
+        base_plane: str,
+        offset: float,
+        name: Optional[str] = None,
+        component_id: Optional[str] = None,
+    ) -> dict:
+        """Create a construction plane offset from an existing plane or face.
+
+        Creates a new construction plane parallel to a base plane at a
+        specified offset distance. Useful for creating sketches or features
+        at specific heights above or below existing geometry.
+
+        **All dimensions are in millimeters (mm).**
+
+        Args:
+            base_plane: Base plane reference. Options:
+                       - "XY", "YZ", "XZ": Standard construction planes
+                       - face_id: ID of a planar face
+                       - plane_id: ID of an existing construction plane
+            offset: Offset distance in mm from the base plane.
+                   Positive = in normal direction, negative = opposite.
+            name: Optional name for the new construction plane.
+            component_id: Optional component ID to create plane in.
+                         Defaults to root component.
+
+        Returns:
+            Dict containing:
+            - success: True if plane was created
+            - plane: Plane information including id, name, origin, normal
+            - feature: Feature information including id and type
+
+        Example:
+            # Create a plane 50mm above the XY plane
+            result = await create_offset_plane(base_plane="XY", offset=50)
+
+            # Create a plane 10mm below a face
+            result = await create_offset_plane(
+                base_plane="Body1_face_0",
+                offset=-10,
+                name="BottomPlane"
+            )
+        """
+        logger.info(
+            "create_offset_plane called",
+            base_plane=base_plane,
+            offset=offset,
+            name=name,
+            component_id=component_id,
+        )
+        async with FusionClient() as client:
+            return await client.create_offset_plane(
+                base_plane=base_plane,
+                offset=offset,
+                name=name,
+                component_id=component_id,
+            )
+
+    @mcp.tool()
+    async def create_angle_plane(
+        base_plane: str,
+        edge_id: str,
+        angle: float,
+        name: Optional[str] = None,
+        component_id: Optional[str] = None,
+    ) -> dict:
+        """Create a construction plane at an angle from a plane along an edge.
+
+        Creates a new construction plane by rotating a base plane around
+        a linear edge. The edge must lie on or be parallel to the base plane.
+        Useful for angled features, draft faces, and wedge shapes.
+
+        **Angle is in degrees, dimensions in millimeters (mm).**
+
+        Args:
+            base_plane: Base plane reference. Options:
+                       - "XY", "YZ", "XZ": Standard construction planes
+                       - face_id: ID of a planar face
+                       - plane_id: ID of an existing construction plane
+            edge_id: ID of a linear edge to rotate around. Get edge IDs from
+                    get_body_by_id with include_edges=True.
+            angle: Rotation angle in degrees from the base plane.
+                  Positive = counterclockwise when looking along edge.
+            name: Optional name for the new construction plane.
+            component_id: Optional component ID to create plane in.
+
+        Returns:
+            Dict containing:
+            - success: True if plane was created
+            - plane: Plane information including id, name, origin, normal
+            - feature: Feature information including id and type
+
+        Example:
+            # Create a plane at 45 degrees from XY plane along an edge
+            body = await get_body_by_id(body_id="Body1", include_edges=True)
+            result = await create_angle_plane(
+                base_plane="XY",
+                edge_id=body["edges"][0]["id"],
+                angle=45,
+                name="AngledPlane"
+            )
+        """
+        logger.info(
+            "create_angle_plane called",
+            base_plane=base_plane,
+            edge_id=edge_id,
+            angle=angle,
+            name=name,
+            component_id=component_id,
+        )
+        async with FusionClient() as client:
+            return await client.create_angle_plane(
+                base_plane=base_plane,
+                edge_id=edge_id,
+                angle=angle,
+                name=name,
+                component_id=component_id,
+            )
+
+    @mcp.tool()
+    async def create_three_point_plane(
+        point1: dict,
+        point2: dict,
+        point3: dict,
+        name: Optional[str] = None,
+        component_id: Optional[str] = None,
+    ) -> dict:
+        """Create a construction plane through three points.
+
+        Creates a new construction plane defined by three non-collinear
+        points. The first point becomes the plane origin. Useful for
+        creating planes at arbitrary orientations in 3D space.
+
+        **All coordinates are in millimeters (mm).**
+
+        Args:
+            point1: First point {x, y, z} in mm. Becomes the plane origin.
+            point2: Second point {x, y, z} in mm.
+            point3: Third point {x, y, z} in mm.
+                   The three points must not be collinear (on the same line).
+            name: Optional name for the new construction plane.
+            component_id: Optional component ID to create plane in.
+
+        Returns:
+            Dict containing:
+            - success: True if plane was created
+            - plane: Plane information including id, name, origin, normal
+            - feature: Feature information including id and type
+
+        Example:
+            # Create a tilted plane through three points
+            result = await create_three_point_plane(
+                point1={"x": 0, "y": 0, "z": 0},
+                point2={"x": 100, "y": 0, "z": 0},
+                point3={"x": 50, "y": 50, "z": 25},
+                name="TiltedPlane"
+            )
+
+            # Create a plane at body corners
+            result = await create_three_point_plane(
+                point1={"x": 0, "y": 0, "z": 10},
+                point2={"x": 100, "y": 0, "z": 10},
+                point3={"x": 0, "y": 50, "z": 10}
+            )
+        """
+        logger.info(
+            "create_three_point_plane called",
+            point1=point1,
+            point2=point2,
+            point3=point3,
+            name=name,
+            component_id=component_id,
+        )
+        async with FusionClient() as client:
+            return await client.create_three_point_plane(
+                point1=point1,
+                point2=point2,
+                point3=point3,
+                name=name,
+                component_id=component_id,
+            )
+
+    @mcp.tool()
+    async def create_midplane(
+        plane1: str,
+        plane2: str,
+        name: Optional[str] = None,
+        component_id: Optional[str] = None,
+    ) -> dict:
+        """Create a construction plane midway between two parallel planes.
+
+        Creates a new construction plane positioned exactly halfway between
+        two parallel planes or faces. The planes must be parallel to each
+        other. Useful for symmetry operations and centering features.
+
+        Args:
+            plane1: First plane reference. Options:
+                   - "XY", "YZ", "XZ": Standard construction planes
+                   - face_id: ID of a planar face
+                   - plane_id: ID of an existing construction plane
+            plane2: Second plane reference (must be parallel to plane1).
+            name: Optional name for the new construction plane.
+            component_id: Optional component ID to create plane in.
+
+        Returns:
+            Dict containing:
+            - success: True if plane was created
+            - plane: Plane information including id, name, origin, normal
+            - feature: Feature information including id and type
+
+        Example:
+            # Create a midplane between a box's top and bottom faces
+            body = await get_body_by_id(body_id="Body1", include_faces=True)
+            top_face = body["faces"][0]["id"]
+            bottom_face = body["faces"][1]["id"]
+            result = await create_midplane(
+                plane1=top_face,
+                plane2=bottom_face,
+                name="CenterPlane"
+            )
+
+            # Create a midplane between two construction planes
+            result = await create_midplane(
+                plane1="ConstructionPlane1",
+                plane2="ConstructionPlane2"
+            )
+        """
+        logger.info(
+            "create_midplane called",
+            plane1=plane1,
+            plane2=plane2,
+            name=name,
+            component_id=component_id,
+        )
+        async with FusionClient() as client:
+            return await client.create_midplane(
+                plane1=plane1,
+                plane2=plane2,
+                name=name,
+                component_id=component_id,
+            )
+
     logger.info("Creation tools registered")

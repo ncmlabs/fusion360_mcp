@@ -2068,3 +2068,123 @@ class FusionClient:
         if entity_ids is not None:
             data["entity_ids"] = entity_ids
         return await self._request("POST", "/viewport/fit", data)
+
+    # --- Construction Plane Methods ---
+
+    async def create_offset_plane(
+        self,
+        base_plane: str,
+        offset: float,
+        name: Optional[str] = None,
+        component_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a construction plane offset from an existing plane or face.
+
+        Args:
+            base_plane: Base plane ("XY", "YZ", "XZ") or face/plane ID
+            offset: Offset distance in mm (positive or negative)
+            name: Optional name for the plane
+            component_id: Optional component ID
+
+        Returns:
+            Dict with plane info including id, origin, normal
+        """
+        data: Dict[str, Any] = {
+            "base_plane": base_plane,
+            "offset": offset,
+        }
+        if name is not None:
+            data["name"] = name
+        if component_id is not None:
+            data["component_id"] = component_id
+        return await self._request("POST", "/create/plane/offset", data)
+
+    async def create_angle_plane(
+        self,
+        base_plane: str,
+        edge_id: str,
+        angle: float,
+        name: Optional[str] = None,
+        component_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a construction plane at an angle from a plane along an edge.
+
+        Args:
+            base_plane: Base plane ("XY", "YZ", "XZ") or face/plane ID
+            edge_id: ID of the edge to rotate around
+            angle: Rotation angle in degrees
+            name: Optional name for the plane
+            component_id: Optional component ID
+
+        Returns:
+            Dict with plane info including id, origin, normal
+        """
+        data: Dict[str, Any] = {
+            "base_plane": base_plane,
+            "edge_id": edge_id,
+            "angle": angle,
+        }
+        if name is not None:
+            data["name"] = name
+        if component_id is not None:
+            data["component_id"] = component_id
+        return await self._request("POST", "/create/plane/angle", data)
+
+    async def create_three_point_plane(
+        self,
+        point1: Dict[str, float],
+        point2: Dict[str, float],
+        point3: Dict[str, float],
+        name: Optional[str] = None,
+        component_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a construction plane through three points.
+
+        Args:
+            point1: First point {x, y, z} in mm
+            point2: Second point {x, y, z} in mm
+            point3: Third point {x, y, z} in mm
+            name: Optional name for the plane
+            component_id: Optional component ID
+
+        Returns:
+            Dict with plane info including id, origin, normal
+        """
+        data: Dict[str, Any] = {
+            "point1": point1,
+            "point2": point2,
+            "point3": point3,
+        }
+        if name is not None:
+            data["name"] = name
+        if component_id is not None:
+            data["component_id"] = component_id
+        return await self._request("POST", "/create/plane/three_points", data)
+
+    async def create_midplane(
+        self,
+        plane1: str,
+        plane2: str,
+        name: Optional[str] = None,
+        component_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a construction plane midway between two planes or faces.
+
+        Args:
+            plane1: First plane ("XY", "YZ", "XZ") or face/plane ID
+            plane2: Second plane ("XY", "YZ", "XZ") or face/plane ID
+            name: Optional name for the plane
+            component_id: Optional component ID
+
+        Returns:
+            Dict with plane info including id, origin, normal
+        """
+        data: Dict[str, Any] = {
+            "plane1": plane1,
+            "plane2": plane2,
+        }
+        if name is not None:
+            data["name"] = name
+        if component_id is not None:
+            data["component_id"] = component_id
+        return await self._request("POST", "/create/plane/midplane", data)
