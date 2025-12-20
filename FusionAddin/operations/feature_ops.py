@@ -2349,12 +2349,8 @@ def emboss(
 # --- MODIFY Menu Tools ---
 
 
-# Map combine operation names to Fusion operation types
-COMBINE_OPERATION_MAP = {
-    "join": adsk.fusion.BooleanTypes.UnionBooleanType if FUSION_AVAILABLE else 0,
-    "cut": adsk.fusion.BooleanTypes.CutBooleanType if FUSION_AVAILABLE else 1,
-    "intersect": adsk.fusion.BooleanTypes.IntersectBooleanType if FUSION_AVAILABLE else 2,
-}
+# Valid operations for combine feature (subset of OPERATION_MAP)
+COMBINE_VALID_OPERATIONS = ["join", "cut", "intersect"]
 
 
 def combine(
@@ -2379,10 +2375,10 @@ def combine(
         EntityNotFoundError: If bodies not found
         FeatureError: If combine fails
     """
-    if operation not in COMBINE_OPERATION_MAP:
+    if operation not in COMBINE_VALID_OPERATIONS:
         raise InvalidParameterError(
             "operation", operation,
-            valid_values=list(COMBINE_OPERATION_MAP.keys())
+            valid_values=COMBINE_VALID_OPERATIONS
         )
 
     if not tool_body_ids:
@@ -2410,7 +2406,7 @@ def combine(
         combine_input = combines.createInput(target_body, tool_bodies)
 
         # Set operation type
-        combine_input.operation = COMBINE_OPERATION_MAP[operation]
+        combine_input.operation = OPERATION_MAP[operation]
 
         # Set whether to keep tool bodies
         combine_input.isKeepToolBodies = keep_tools
