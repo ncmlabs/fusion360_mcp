@@ -1211,6 +1211,87 @@ class FusionClient:
             "properties": properties,
         })
 
+    # --- MODIFY Menu Methods ---
+
+    async def combine(
+        self,
+        target_body_id: str,
+        tool_body_ids: List[str],
+        operation: str = "join",
+        keep_tools: bool = False,
+    ) -> Dict[str, Any]:
+        """Combine multiple bodies using boolean operations.
+
+        Args:
+            target_body_id: ID of the body to modify (target)
+            tool_body_ids: List of body IDs to combine with (tools)
+            operation: "join", "cut", or "intersect"
+            keep_tools: If True, keep tool bodies after operation
+
+        Returns:
+            Dict with feature info and resulting body
+        """
+        return await self._request("POST", "/modify/combine", {
+            "target_body_id": target_body_id,
+            "tool_body_ids": tool_body_ids,
+            "operation": operation,
+            "keep_tools": keep_tools,
+        })
+
+    async def split_body(
+        self,
+        body_id: str,
+        splitting_tool: str,
+        extend_splitting_tool: bool = True,
+    ) -> Dict[str, Any]:
+        """Split a body using a plane or face.
+
+        Args:
+            body_id: ID of the body to split
+            splitting_tool: Face ID, plane ID, or "XY"/"YZ"/"XZ"
+            extend_splitting_tool: If True, extend tool to fully split body
+
+        Returns:
+            Dict with feature info and resulting bodies
+        """
+        return await self._request("POST", "/modify/split_body", {
+            "body_id": body_id,
+            "splitting_tool": splitting_tool,
+            "extend_splitting_tool": extend_splitting_tool,
+        })
+
+    async def shell(
+        self,
+        body_id: str,
+        face_ids: List[str],
+        thickness: float,
+        direction: str = "inside",
+    ) -> Dict[str, Any]:
+        """Create hollow shell by removing faces and adding wall thickness.
+
+        Args:
+            body_id: ID of the body to shell
+            face_ids: List of face IDs to remove (become openings)
+            thickness: Wall thickness in mm
+            direction: "inside" or "outside"
+
+        Returns:
+            Dict with feature info and resulting body
+        """
+        return await self._request("POST", "/modify/shell", {
+            "body_id": body_id,
+            "face_ids": face_ids,
+            "thickness": thickness,
+            "direction": direction,
+        })
+
+    # NOTE: The following methods are implemented but disabled pending debugging:
+    # - draft: Add draft angle to faces
+    # - scale: Scale bodies
+    # - offset_face: Offset faces
+    # - split_face: Split faces
+    # See feature_ops.py in the add-in for the core implementations.
+
     # --- Validation Methods ---
 
     async def measure_distance(
