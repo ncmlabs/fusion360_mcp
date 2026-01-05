@@ -38,6 +38,30 @@ An MCP (Model Context Protocol) server that enables AI assistants to interact wi
 
    In Fusion 360: Tools > Add-ins > FusionMCP > Run
 
+4. **Configure Your MCP Client**
+
+   Copy the example configuration and update the path:
+
+   ```bash
+   cp .mcp.json.example .mcp.json
+   ```
+
+   Edit `.mcp.json` and update the Python path to point to your virtual environment:
+
+   ```json
+   {
+     "mcpServers": {
+       "fusion360": {
+         "command": "/path/to/fusion360_mcp/Server/.venv/bin/python",
+         "args": [
+           "-m", "fusion360_mcp_server.main",
+           "--transport", "stdio"
+         ]
+       }
+     }
+   }
+   ```
+
 ### Running the Server
 
 ```bash
