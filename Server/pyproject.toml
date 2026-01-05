@@ -21,6 +21,13 @@ dependencies = [
     "python-dotenv>=1.0.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/ncmlabs/fusion360_mcp"
+Documentation = "https://github.com/ncmlabs/fusion360_mcp#readme"
+Repository = "https://github.com/ncmlabs/fusion360_mcp"
+Issues = "https://github.com/ncmlabs/fusion360_mcp/issues"
+Changelog = "https://github.com/ncmlabs/fusion360_mcp/blob/main/CHANGELOG.md"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4.0",
