@@ -846,6 +846,41 @@ class FusionClient:
             "project_type": project_type,
         })
 
+    async def wrap_sketch_to_surface(
+        self,
+        sketch_id: str,
+        face_id: str,
+        projection_type: str = "closest_point",
+        direction_axis: Optional[str] = None,
+        create_new_sketch: bool = True,
+    ) -> Dict[str, Any]:
+        """Wrap sketch curves onto a curved surface using projection.
+
+        Projects 2D sketch geometry onto curved 3D surfaces like cylinders,
+        spheres, or other curved faces using Fusion 360's projectToSurface.
+
+        Args:
+            sketch_id: ID of the source sketch containing curves to wrap
+            face_id: ID of the target curved face to wrap onto
+            projection_type: Projection method:
+                - "closest_point": Projects each point to nearest surface point
+                - "along_vector": Projects along a specific direction
+            direction_axis: Required for "along_vector" type ("X", "Y", or "Z")
+            create_new_sketch: If True, creates new sketch for wrapped curves
+
+        Returns:
+            Dict with wrapped curve IDs, sketch info, and projection details
+        """
+        data: Dict[str, Any] = {
+            "sketch_id": sketch_id,
+            "face_id": face_id,
+            "projection_type": projection_type,
+            "create_new_sketch": create_new_sketch,
+        }
+        if direction_axis is not None:
+            data["direction_axis"] = direction_axis
+        return await self._request("POST", "/sketch/wrap_to_surface", data)
+
     async def add_sketch_text(
         self,
         sketch_id: str,

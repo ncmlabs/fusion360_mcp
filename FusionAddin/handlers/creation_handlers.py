@@ -24,6 +24,7 @@ from operations.sketch_ops import (
     sketch_rectangular_pattern,
     project_geometry,
     add_sketch_text,
+    wrap_sketch_to_surface,
     # Phase 7c: Sketch Constraints & Dimensions
     add_constraint_horizontal,
     add_constraint_vertical,
@@ -863,6 +864,36 @@ def handle_add_sketch_text(args: Dict[str, Any]) -> Dict[str, Any]:
         font_name=args.get("font_name"),
         is_bold=bool(args.get("is_bold", False)),
         is_italic=bool(args.get("is_italic", False)),
+    )
+
+
+def handle_wrap_sketch_to_surface(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle wrap_sketch_to_surface request.
+
+    Wraps sketch curves onto a curved surface using projection.
+
+    Args:
+        args: Request arguments
+            - sketch_id: ID of the source sketch (required)
+            - face_id: ID of the target curved face (required)
+            - projection_type: "closest_point" or "along_vector" (default closest_point)
+            - direction_axis: "X", "Y", or "Z" (required when projection_type is along_vector)
+            - create_new_sketch: Whether to create a new sketch (default True)
+
+    Returns:
+        Dict with wrapped curve IDs and sketch information
+    """
+    if "sketch_id" not in args:
+        raise InvalidParameterError("sketch_id", None, reason="sketch_id is required")
+    if "face_id" not in args:
+        raise InvalidParameterError("face_id", None, reason="face_id is required")
+
+    return wrap_sketch_to_surface(
+        sketch_id=args["sketch_id"],
+        face_id=args["face_id"],
+        projection_type=args.get("projection_type", "closest_point"),
+        direction_axis=args.get("direction_axis"),
+        create_new_sketch=bool(args.get("create_new_sketch", True)),
     )
 
 

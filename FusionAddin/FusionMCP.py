@@ -61,6 +61,7 @@ from handlers.creation_handlers import (
     handle_sketch_rectangular_pattern,
     handle_project_geometry,
     handle_add_sketch_text,
+    handle_wrap_sketch_to_surface,
     # Phase 7c: Sketch constraints & dimensions
     handle_add_constraint_horizontal,
     handle_add_constraint_vertical,
@@ -291,6 +292,7 @@ def _register_task_handlers() -> None:
     _event_manager.register_task_handler("sketch_rectangular_pattern", handle_sketch_rectangular_pattern)
     _event_manager.register_task_handler("project_geometry", handle_project_geometry)
     _event_manager.register_task_handler("add_sketch_text", handle_add_sketch_text)
+    _event_manager.register_task_handler("wrap_sketch_to_surface", handle_wrap_sketch_to_surface)
 
     # Phase 7c: Sketch constraints & dimensions handlers
     _event_manager.register_task_handler("add_constraint_horizontal", handle_add_constraint_horizontal)
@@ -424,6 +426,7 @@ def _register_creation_routes() -> None:
     FusionHTTPHandler.register_route("POST", "/sketch/rectangular_pattern", "sketch_rectangular_pattern")
     FusionHTTPHandler.register_route("POST", "/sketch/project", "project_geometry")
     FusionHTTPHandler.register_route("POST", "/sketch/text", "add_sketch_text")
+    FusionHTTPHandler.register_route("POST", "/sketch/wrap_to_surface", "wrap_sketch_to_surface")
 
     # Phase 7c: Sketch constraints & dimensions routes
     FusionHTTPHandler.register_route("POST", "/sketch/constraint/horizontal", "add_constraint_horizontal")
