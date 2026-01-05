@@ -1,0 +1,181 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      dry_run:
+        description: 'Dry run (preview changes without committing)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        working-directory: ./Server
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run linting with ruff
+        working-directory: ./Server
+        run: |
+          pip install ruff
+          ruff check src/
+
+      - name: Run tests with pytest
+        working-directory: ./Server
+        run: |
+          pytest tests/ -v
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [test]
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install release tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install bump-my-version>=0.26.0
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Get current version
+        id: current_version
+        run: |
+          CURRENT=$(grep -Po 'current_version = "\K[^"]+' .bumpversion.toml)
+          echo "version=$CURRENT" >> $GITHUB_OUTPUT
+
+      - name: Preview version bump (dry run)
+        if: inputs.dry_run
+        run: |
+          echo "=== DRY RUN: Version Bump Preview ==="
+          echo "Current version: ${{ steps.current_version.outputs.version }}"
+          echo "Bump type: ${{ inputs.bump_type }}"
+          echo ""
+          bump-my-version bump ${{ inputs.bump_type }} --dry-run --verbose
+
+      - name: Preview changelog (dry run)
+        if: inputs.dry_run
+        run: |
+          echo "=== DRY RUN: Changelog Preview ==="
+          git-cliff --unreleased --tag "v${{ steps.current_version.outputs.version }}" | head -100
+
+      - name: Bump version
+        if: ${{ !inputs.dry_run }}
+        id: bump
+        run: |
+          bump-my-version bump ${{ inputs.bump_type }} --verbose
+          NEW_VERSION=$(grep -Po 'current_version = "\K[^"]+' .bumpversion.toml)
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+
+      - name: Generate changelog for release
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git-cliff --latest --strip header > RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
+      - name: Update full changelog
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git-cliff --output CHANGELOG.md
+
+      - name: Commit version bump
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git add .
+          git commit -m "chore(release): bump version to v${{ steps.bump.outputs.new_version }}"
+
+      - name: Create git tag
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git tag -a "v${{ steps.bump.outputs.new_version }}" -m "Release v${{ steps.bump.outputs.new_version }}"
+
+      - name: Push changes
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git push origin HEAD
+          git push origin "v${{ steps.bump.outputs.new_version }}"
+
+      - name: Build distribution
+        if: ${{ !inputs.dry_run }}
+        working-directory: ./Server
+        run: |
+          pip install build
+          python -m build
+
+      - name: Create GitHub Release
+        if: ${{ !inputs.dry_run }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ steps.bump.outputs.new_version }}"
+          name: "v${{ steps.bump.outputs.new_version }}"
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+          files: |
+            Server/dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        if: ${{ !inputs.dry_run }}
+        run: |
+          echo "## Release Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** v${{ steps.bump.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** [v${{ steps.bump.outputs.new_version }}](https://github.com/${{ github.repository }}/releases/tag/v${{ steps.bump.outputs.new_version }})" >> $GITHUB_STEP_SUMMARY
+
+      - name: Dry run summary
+        if: inputs.dry_run
+        run: |
+          echo "## Dry Run Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Current version:** ${{ steps.current_version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Bump type:** ${{ inputs.bump_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "No changes were made. Run without dry_run to perform the release." >> $GITHUB_STEP_SUMMARY

@@ -29,6 +29,7 @@ dev = [
     "respx>=0.21.0",
     "mypy>=1.7.0",
     "ruff>=0.1.0",
+    "bump-my-version>=0.26.0",
 ]
 
 [project.scripts]
