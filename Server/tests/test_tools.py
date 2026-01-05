@@ -9,7 +9,7 @@ from fusion360_mcp_server.tools.query_tools import register_query_tools
 from fusion360_mcp_server.tools.creation_tools import register_creation_tools
 from fusion360_mcp_server.tools.modification_tools import register_modification_tools
 from fusion360_mcp_server.tools.validation_tools import register_validation_tools
-from fusion360_mcp_server.tools.system_tools import register_system_tools
+from fusion360_mcp_server.tools.system_tools import register_system_tools, SERVER_VERSION
 
 
 @pytest.fixture
@@ -443,7 +443,7 @@ class TestSystemTools:
         tool = mcp._tool_manager._tools["get_version"]
         result = await tool.fn()
 
-        assert result["server_version"] == "0.1.0"
+        assert result["server_version"] == SERVER_VERSION
         assert result["addin_version"] == "0.1.0"
         assert result["fusion_version"] == "2.0.18719"
 

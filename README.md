@@ -7,9 +7,11 @@ An MCP (Model Context Protocol) server that enables AI assistants to interact wi
 ## Features
 
 - **Query Tools** - Read design state, bodies, sketches, parameters, and timeline
-- **Creation Tools** - Create primitives, sketches, and features
+- **Creation Tools** - Create primitives, sketches, features, and advanced geometry
 - **Modification Tools** - Move, rotate, modify, and delete entities
 - **Validation Tools** - Measure distances, check interference, verify properties
+- **Viewport Tools** - Capture screenshots, control camera views
+- **Assembly Tools** - Create components, manage occurrences, build joints
 - **System Tools** - Health check, version info
 
 ## Quick Start
