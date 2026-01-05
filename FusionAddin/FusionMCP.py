@@ -61,6 +61,7 @@ from handlers.creation_handlers import (
     handle_sketch_rectangular_pattern,
     handle_project_geometry,
     handle_add_sketch_text,
+    handle_wrap_sketch_to_surface,
     # Phase 7c: Sketch constraints & dimensions
     handle_add_constraint_horizontal,
     handle_add_constraint_vertical,
@@ -109,6 +110,10 @@ from handlers.modification_handlers import (
     handle_delete_body,
     handle_delete_feature,
     handle_edit_sketch,
+    # MODIFY menu tools
+    handle_combine,
+    handle_split_body,
+    handle_shell,
 )
 
 # Import validation handlers
@@ -287,6 +292,7 @@ def _register_task_handlers() -> None:
     _event_manager.register_task_handler("sketch_rectangular_pattern", handle_sketch_rectangular_pattern)
     _event_manager.register_task_handler("project_geometry", handle_project_geometry)
     _event_manager.register_task_handler("add_sketch_text", handle_add_sketch_text)
+    _event_manager.register_task_handler("wrap_sketch_to_surface", handle_wrap_sketch_to_surface)
 
     # Phase 7c: Sketch constraints & dimensions handlers
     _event_manager.register_task_handler("add_constraint_horizontal", handle_add_constraint_horizontal)
@@ -339,6 +345,11 @@ def _register_task_handlers() -> None:
     _event_manager.register_task_handler("delete_body", handle_delete_body)
     _event_manager.register_task_handler("delete_feature", handle_delete_feature)
     _event_manager.register_task_handler("edit_sketch", handle_edit_sketch)
+
+    # MODIFY menu tools
+    _event_manager.register_task_handler("combine", handle_combine)
+    _event_manager.register_task_handler("split_body", handle_split_body)
+    _event_manager.register_task_handler("shell", handle_shell)
 
     # Phase 4: Validation handlers
     _event_manager.register_task_handler("measure_distance", handle_measure_distance)
@@ -415,6 +426,7 @@ def _register_creation_routes() -> None:
     FusionHTTPHandler.register_route("POST", "/sketch/rectangular_pattern", "sketch_rectangular_pattern")
     FusionHTTPHandler.register_route("POST", "/sketch/project", "project_geometry")
     FusionHTTPHandler.register_route("POST", "/sketch/text", "add_sketch_text")
+    FusionHTTPHandler.register_route("POST", "/sketch/wrap_to_surface", "wrap_sketch_to_surface")
 
     # Phase 7c: Sketch constraints & dimensions routes
     FusionHTTPHandler.register_route("POST", "/sketch/constraint/horizontal", "add_constraint_horizontal")
@@ -476,6 +488,11 @@ def _register_modification_routes() -> None:
 
     # Phase 3: Sketch edit routes
     FusionHTTPHandler.register_route("POST", "/modify/sketch", "edit_sketch")
+
+    # MODIFY menu tools
+    FusionHTTPHandler.register_route("POST", "/modify/combine", "combine")
+    FusionHTTPHandler.register_route("POST", "/modify/split_body", "split_body")
+    FusionHTTPHandler.register_route("POST", "/modify/shell", "shell")
 
 
 def _register_validation_routes() -> None:

@@ -846,6 +846,41 @@ class FusionClient:
             "project_type": project_type,
         })
 
+    async def wrap_sketch_to_surface(
+        self,
+        sketch_id: str,
+        face_id: str,
+        projection_type: str = "closest_point",
+        direction_axis: Optional[str] = None,
+        create_new_sketch: bool = True,
+    ) -> Dict[str, Any]:
+        """Wrap sketch curves onto a curved surface using projection.
+
+        Projects 2D sketch geometry onto curved 3D surfaces like cylinders,
+        spheres, or other curved faces using Fusion 360's projectToSurface.
+
+        Args:
+            sketch_id: ID of the source sketch containing curves to wrap
+            face_id: ID of the target curved face to wrap onto
+            projection_type: Projection method:
+                - "closest_point": Projects each point to nearest surface point
+                - "along_vector": Projects along a specific direction
+            direction_axis: Required for "along_vector" type ("X", "Y", or "Z")
+            create_new_sketch: If True, creates new sketch for wrapped curves
+
+        Returns:
+            Dict with wrapped curve IDs, sketch info, and projection details
+        """
+        data: Dict[str, Any] = {
+            "sketch_id": sketch_id,
+            "face_id": face_id,
+            "projection_type": projection_type,
+            "create_new_sketch": create_new_sketch,
+        }
+        if direction_axis is not None:
+            data["direction_axis"] = direction_axis
+        return await self._request("POST", "/sketch/wrap_to_surface", data)
+
     async def add_sketch_text(
         self,
         sketch_id: str,
@@ -1210,6 +1245,87 @@ class FusionClient:
             "curve_id": curve_id,
             "properties": properties,
         })
+
+    # --- MODIFY Menu Methods ---
+
+    async def combine(
+        self,
+        target_body_id: str,
+        tool_body_ids: List[str],
+        operation: str = "join",
+        keep_tools: bool = False,
+    ) -> Dict[str, Any]:
+        """Combine multiple bodies using boolean operations.
+
+        Args:
+            target_body_id: ID of the body to modify (target)
+            tool_body_ids: List of body IDs to combine with (tools)
+            operation: "join", "cut", or "intersect"
+            keep_tools: If True, keep tool bodies after operation
+
+        Returns:
+            Dict with feature info and resulting body
+        """
+        return await self._request("POST", "/modify/combine", {
+            "target_body_id": target_body_id,
+            "tool_body_ids": tool_body_ids,
+            "operation": operation,
+            "keep_tools": keep_tools,
+        })
+
+    async def split_body(
+        self,
+        body_id: str,
+        splitting_tool: str,
+        extend_splitting_tool: bool = True,
+    ) -> Dict[str, Any]:
+        """Split a body using a plane or face.
+
+        Args:
+            body_id: ID of the body to split
+            splitting_tool: Face ID, plane ID, or "XY"/"YZ"/"XZ"
+            extend_splitting_tool: If True, extend tool to fully split body
+
+        Returns:
+            Dict with feature info and resulting bodies
+        """
+        return await self._request("POST", "/modify/split_body", {
+            "body_id": body_id,
+            "splitting_tool": splitting_tool,
+            "extend_splitting_tool": extend_splitting_tool,
+        })
+
+    async def shell(
+        self,
+        body_id: str,
+        face_ids: List[str],
+        thickness: float,
+        direction: str = "inside",
+    ) -> Dict[str, Any]:
+        """Create hollow shell by removing faces and adding wall thickness.
+
+        Args:
+            body_id: ID of the body to shell
+            face_ids: List of face IDs to remove (become openings)
+            thickness: Wall thickness in mm
+            direction: "inside" or "outside"
+
+        Returns:
+            Dict with feature info and resulting body
+        """
+        return await self._request("POST", "/modify/shell", {
+            "body_id": body_id,
+            "face_ids": face_ids,
+            "thickness": thickness,
+            "direction": direction,
+        })
+
+    # NOTE: The following methods are implemented but disabled pending debugging:
+    # - draft: Add draft angle to faces
+    # - scale: Scale bodies
+    # - offset_face: Offset faces
+    # - split_face: Split faces
+    # See feature_ops.py in the add-in for the core implementations.
 
     # --- Validation Methods ---
 
@@ -1953,32 +2069,28 @@ class FusionClient:
 
     async def take_screenshot(
         self,
-        file_path: Optional[str] = None,
+        file_path: str,
         view: str = "current",
         width: int = 1920,
         height: int = 1080,
-        return_base64: bool = True,
     ) -> Dict[str, Any]:
         """Capture the viewport as a PNG image.
 
         Args:
-            file_path: Optional path to save the image
+            file_path: Path to save the image (required)
             view: View to capture ("current" or standard view name)
             width: Image width in pixels
             height: Image height in pixels
-            return_base64: Return base64-encoded image data
 
         Returns:
-            Dict with image data and metadata
+            Dict with image metadata
         """
         data: Dict[str, Any] = {
+            "file_path": file_path,
             "view": view,
             "width": width,
             "height": height,
-            "return_base64": return_base64,
         }
-        if file_path is not None:
-            data["file_path"] = file_path
         return await self._request("POST", "/viewport/screenshot", data)
 
     async def set_camera(

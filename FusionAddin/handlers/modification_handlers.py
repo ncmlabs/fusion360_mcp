@@ -15,6 +15,11 @@ from operations.modification_ops import (
     delete_feature,
     edit_sketch,
 )
+from operations.feature_ops import (
+    combine,
+    split_body,
+    shell,
+)
 from shared.exceptions import InvalidParameterError
 
 
@@ -251,3 +256,106 @@ def handle_edit_sketch(args: Dict[str, Any]) -> Dict[str, Any]:
         curve_id=args["curve_id"],
         properties=converted_props,
     )
+
+
+# --- MODIFY Menu Handlers ---
+
+
+def handle_combine(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle combine request.
+
+    Combines multiple bodies using boolean operations (join, cut, intersect).
+
+    Args:
+        args: Request arguments
+            - target_body_id: ID of the body to modify (required)
+            - tool_body_ids: List of body IDs to combine with (required)
+            - operation: "join", "cut", or "intersect" (default "join")
+            - keep_tools: Keep tool bodies after operation (default False)
+
+    Returns:
+        Dict with success, feature info, and resulting body
+    """
+    if "target_body_id" not in args:
+        raise InvalidParameterError("target_body_id", None, reason="target_body_id is required")
+    if "tool_body_ids" not in args:
+        raise InvalidParameterError("tool_body_ids", None, reason="tool_body_ids is required")
+
+    tool_body_ids = args["tool_body_ids"]
+    if not isinstance(tool_body_ids, list):
+        tool_body_ids = [tool_body_ids]
+
+    return combine(
+        target_body_id=args["target_body_id"],
+        tool_body_ids=tool_body_ids,
+        operation=args.get("operation", "join"),
+        keep_tools=bool(args.get("keep_tools", False)),
+    )
+
+
+def handle_split_body(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle split_body request.
+
+    Splits a body using a plane or face.
+
+    Args:
+        args: Request arguments
+            - body_id: ID of the body to split (required)
+            - splitting_tool: Face ID, plane ID, or "XY"/"YZ"/"XZ" (required)
+            - extend_splitting_tool: Extend tool to fully split (default True)
+
+    Returns:
+        Dict with success, feature info, and resulting bodies
+    """
+    if "body_id" not in args:
+        raise InvalidParameterError("body_id", None, reason="body_id is required")
+    if "splitting_tool" not in args:
+        raise InvalidParameterError("splitting_tool", None, reason="splitting_tool is required")
+
+    return split_body(
+        body_id=args["body_id"],
+        splitting_tool=args["splitting_tool"],
+        extend_splitting_tool=bool(args.get("extend_splitting_tool", True)),
+    )
+
+
+def handle_shell(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Handle shell request.
+
+    Creates a hollow shell by removing faces and adding wall thickness.
+
+    Args:
+        args: Request arguments
+            - body_id: ID of the body to shell (required)
+            - face_ids: List of face IDs to remove (required)
+            - thickness: Wall thickness in mm (required)
+            - direction: "inside" or "outside" (default "inside")
+
+    Returns:
+        Dict with success, feature info, and resulting body
+    """
+    if "body_id" not in args:
+        raise InvalidParameterError("body_id", None, reason="body_id is required")
+    if "face_ids" not in args:
+        raise InvalidParameterError("face_ids", None, reason="face_ids is required")
+    if "thickness" not in args:
+        raise InvalidParameterError("thickness", None, reason="thickness is required")
+
+    face_ids = args["face_ids"]
+    if not isinstance(face_ids, list):
+        face_ids = [face_ids]
+
+    return shell(
+        body_id=args["body_id"],
+        face_ids=face_ids,
+        thickness=float(args["thickness"]),
+        direction=args.get("direction", "inside"),
+    )
+
+
+# NOTE: The following handlers are implemented but disabled pending debugging:
+# - handle_draft: Add draft angle to faces
+# - handle_scale: Scale bodies
+# - handle_offset_face: Offset faces
+# - handle_split_face: Split faces
+# See feature_ops.py for the core implementations.

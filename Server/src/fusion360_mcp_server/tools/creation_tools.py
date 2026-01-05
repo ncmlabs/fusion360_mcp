@@ -1425,6 +1425,85 @@ def register_creation_tools(mcp: FastMCP) -> None:
                 is_italic=is_italic,
             )
 
+    @mcp.tool()
+    async def wrap_sketch_to_surface(
+        sketch_id: str,
+        face_id: str,
+        projection_type: str = "closest_point",
+        direction_axis: Optional[str] = None,
+        create_new_sketch: bool = True,
+    ) -> dict:
+        """Wrap sketch curves onto a curved surface using projection.
+
+        Projects 2D sketch geometry (curves, shapes) onto curved surfaces
+        like cylinders, enabling text/logos to conform to cylindrical objects.
+        Uses Fusion 360's `projectToSurface()` method.
+
+        **Use this for:** Adding logos or patterns to bottles, wrapping text
+        around pipes, creating curved labels on cylindrical objects.
+
+        Args:
+            sketch_id: ID of the source sketch containing curves to wrap.
+                      Get this from create_sketch or get_sketches.
+            face_id: ID of the target curved face (e.g., cylinder surface).
+                    Get face IDs from get_body_by_id with include_faces=True.
+            projection_type: Projection method:
+                - "closest_point": Project curves to closest point on surface (default)
+                - "along_vector": Project along a specified axis direction
+            direction_axis: Required when projection_type is "along_vector".
+                           Options: "X", "Y", "Z" for construction axes.
+            create_new_sketch: If True (default), create a new sketch for the
+                             projected curves. If False, add to existing sketch.
+
+        Returns:
+            Dict containing:
+            - success: True if projection succeeded
+            - wrapped_curves: List of new curve IDs created on the surface
+            - wrapped_sketch_id: ID of the sketch containing wrapped curves
+            - source_sketch_id: Original sketch ID
+            - face_id: Target face ID
+            - projection_type: Projection method used
+            - curves_created: Number of curves created
+            - profiles_count: Number of closed profiles in wrapped sketch
+
+        Example:
+            # Create a cylinder and wrap a shape onto it
+            cyl = await create_cylinder(radius=25, height=100)
+            body = await get_body_by_id(body_id=cyl["body"]["id"], include_faces=True)
+            # Find the cylindrical face (not top/bottom)
+            cyl_face_id = body["faces"][1]["id"]
+
+            # Create a sketch with shapes to wrap
+            sketch = await create_sketch(plane="XY")
+            await draw_circle(sketch_id=sketch["sketch"]["id"],
+                            center_x=0, center_y=0, radius=5)
+
+            # Wrap the sketch onto the cylinder
+            result = await wrap_sketch_to_surface(
+                sketch_id=sketch["sketch"]["id"],
+                face_id=cyl_face_id
+            )
+
+            # The wrapped curves can now be used for emboss/extrude
+            # if profiles were created
+        """
+        logger.info(
+            "wrap_sketch_to_surface called",
+            sketch_id=sketch_id,
+            face_id=face_id,
+            projection_type=projection_type,
+            direction_axis=direction_axis,
+            create_new_sketch=create_new_sketch,
+        )
+        async with FusionClient() as client:
+            return await client.wrap_sketch_to_surface(
+                sketch_id=sketch_id,
+                face_id=face_id,
+                projection_type=projection_type,
+                direction_axis=direction_axis,
+                create_new_sketch=create_new_sketch,
+            )
+
     # --- Phase 7c: Sketch Constraints & Dimensions ---
 
     @mcp.tool()

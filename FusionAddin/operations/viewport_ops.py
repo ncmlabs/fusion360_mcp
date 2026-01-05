@@ -5,8 +5,6 @@ screenshots for visualization.
 """
 
 import os
-import base64
-import tempfile
 from typing import Dict, Any, Optional, List, Tuple
 
 # Fusion 360 API imports
@@ -232,26 +230,22 @@ def _set_standard_view(viewport: Any, view: str, smooth: bool = True) -> None:
 
 
 def take_screenshot(
-    file_path: Optional[str] = None,
+    file_path: str,
     view: str = "current",
     width: int = 1920,
     height: int = 1080,
-    return_base64: bool = True,
 ) -> Dict[str, Any]:
     """Capture the viewport as a PNG image.
 
     Args:
-        file_path: Optional path to save the image. If not provided and
-                   return_base64 is True, uses a temp file.
+        file_path: Path to save the image (required)
         view: View to capture - "current" or a standard view name
         width: Image width in pixels
         height: Image height in pixels
-        return_base64: Whether to return base64-encoded image data
 
     Returns:
         Dict with:
-        - file_path: Path where image was saved (if file_path provided)
-        - base64_image: Base64 encoded image (if return_base64=True)
+        - file_path: Path where image was saved
         - format: "png"
         - dimensions: {width, height}
         - view: View that was captured
@@ -260,6 +254,14 @@ def take_screenshot(
         InvalidParameterError: If parameters are invalid
         DesignStateError: If viewport is not available
     """
+    # Validate file_path
+    if not file_path:
+        raise InvalidParameterError(
+            "file_path",
+            file_path,
+            reason="file_path is required"
+        )
+
     # Validate view parameter
     if view not in VALID_VIEWS:
         raise InvalidParameterError(
@@ -296,59 +298,26 @@ def take_screenshot(
         else:
             _set_standard_view(viewport, view, smooth=False)
 
-    # Determine save path
-    use_temp = file_path is None
-    if use_temp:
-        temp_fd, save_path = tempfile.mkstemp(suffix=".png")
-        os.close(temp_fd)
-    else:
-        save_path = file_path
-        # Ensure directory exists
-        parent_dir = os.path.dirname(save_path)
-        if parent_dir and not os.path.exists(parent_dir):
-            os.makedirs(parent_dir)
+    # Ensure directory exists
+    parent_dir = os.path.dirname(file_path)
+    if parent_dir and not os.path.exists(parent_dir):
+        os.makedirs(parent_dir)
 
-    try:
-        # Capture screenshot
-        success = viewport.saveAsImageFile(save_path, width, height)
+    # Capture screenshot
+    success = viewport.saveAsImageFile(file_path, width, height)
 
-        if not success:
-            raise DesignStateError(
-                "screenshot_failed",
-                "Failed to save viewport image. Check file path and permissions."
-            )
+    if not success:
+        raise DesignStateError(
+            "screenshot_failed",
+            "Failed to save viewport image. Check file path and permissions."
+        )
 
-        result = {
-            "format": "png",
-            "dimensions": {"width": width, "height": height},
-            "view": view,
-        }
-
-        # Include file path if user provided one
-        if file_path:
-            result["file_path"] = file_path
-
-        # Read and encode as base64 if requested
-        if return_base64:
-            with open(save_path, "rb") as f:
-                image_data = f.read()
-            result["base64_image"] = base64.b64encode(image_data).decode("utf-8")
-
-        return result
-
-    finally:
-        # Clean up temp file if we created one and don't need it
-        if use_temp and not return_base64:
-            try:
-                os.unlink(save_path)
-            except:
-                pass
-        elif use_temp and return_base64:
-            # Clean up temp file after reading
-            try:
-                os.unlink(save_path)
-            except:
-                pass
+    return {
+        "format": "png",
+        "dimensions": {"width": width, "height": height},
+        "view": view,
+        "file_path": file_path,
+    }
 
 
 def set_camera(
