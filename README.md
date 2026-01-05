@@ -2,6 +2,8 @@
 
 An MCP (Model Context Protocol) server that enables AI assistants to interact with Autodesk Fusion 360 for CAD design.
 
+![Demo](assets/demo.gif)
+
 ## Features
 
 - **Query Tools** - Read design state, bodies, sketches, parameters, and timeline
