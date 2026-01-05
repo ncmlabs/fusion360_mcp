@@ -443,7 +443,7 @@ class TestSystemTools:
         tool = mcp._tool_manager._tools["get_version"]
         result = await tool.fn()
 
-        assert result["server_version"] == "0.1.0"
+        assert result["server_version"] == "0.1.1"
         assert result["addin_version"] == "0.1.0"
         assert result["fusion_version"] == "2.0.18719"
 

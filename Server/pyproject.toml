@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fusion360-mcp-server"
-version = "0.1.0"
+version = "0.1.1"
 description = "MCP Server for Fusion 360 AI-assisted CAD design"
 readme = "README.md"
 requires-python = ">=3.10"
