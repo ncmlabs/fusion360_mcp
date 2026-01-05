@@ -140,6 +140,16 @@ jobs:
           git push origin HEAD
           git push origin "v${{ steps.bump.outputs.new_version }}"
 
+      - name: Sync development branch
+        if: ${{ !inputs.dry_run }}
+        run: |
+          echo "Syncing version bump to development branch..."
+          git fetch origin development
+          git checkout development
+          git merge main --no-edit -m "chore: sync version ${{ steps.bump.outputs.new_version }} from main"
+          git push origin development
+          git checkout main
+
       - name: Build distribution
         if: ${{ !inputs.dry_run }}
         working-directory: ./Server
@@ -169,6 +179,8 @@ jobs:
           echo "**Version:** v${{ steps.bump.outputs.new_version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Tag:** [v${{ steps.bump.outputs.new_version }}](https://github.com/${{ github.repository }}/releases/tag/v${{ steps.bump.outputs.new_version }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Development branch:** synced with new version" >> $GITHUB_STEP_SUMMARY
 
       - name: Dry run summary
         if: inputs.dry_run
