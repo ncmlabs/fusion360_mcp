@@ -7,8 +7,22 @@ This document provides a complete reference for all MCP tools available in the F
 - [System Tools](#system-tools)
 - [Query Tools](#query-tools)
 - [Creation Tools](#creation-tools)
+  - [Primitives](#primitives)
+  - [Sketches](#sketches)
+  - [Basic Features](#basic-features)
+  - [Advanced Sketch Drawing](#advanced-sketch-drawing)
+  - [Sketch Constraints](#sketch-constraints)
+  - [Sketch Dimensions](#sketch-dimensions)
+  - [Sketch Patterns & Operations](#sketch-patterns--operations)
+  - [Sketch Annotations](#sketch-annotations)
+  - [Advanced Features](#advanced-features)
+  - [Construction Planes](#construction-planes)
+  - [Body Patterns](#body-patterns)
+  - [Body Operations](#body-operations)
 - [Modification Tools](#modification-tools)
 - [Validation Tools](#validation-tools)
+- [Viewport Tools](#viewport-tools)
+- [Assembly Tools](#assembly-tools)
 
 ---
 
@@ -232,7 +246,9 @@ Get the design timeline (feature history).
 
 ## Creation Tools
 
-### create_box
+### Primitives
+
+#### create_box
 
 Create a box (rectangular prism).
 
@@ -263,7 +279,7 @@ Create a box (rectangular prism).
 }
 ```
 
-### create_cylinder
+#### create_cylinder
 
 Create a cylinder.
 
@@ -279,7 +295,9 @@ Create a cylinder.
 | plane | string | No | Construction plane (default: XY) |
 | component_id | string | No | Target component |
 
-### create_sketch
+### Sketches
+
+#### create_sketch
 
 Create a new sketch.
 
@@ -303,7 +321,9 @@ Create a new sketch.
 }
 ```
 
-### draw_line
+### Basic Features
+
+#### draw_line
 
 Draw a line in a sketch.
 
@@ -316,7 +336,7 @@ Draw a line in a sketch.
 | end_x | float | Yes | End X coordinate in mm |
 | end_y | float | Yes | End Y coordinate in mm |
 
-### draw_circle
+#### draw_circle
 
 Draw a circle in a sketch.
 
@@ -328,7 +348,7 @@ Draw a circle in a sketch.
 | center_y | float | Yes | Center Y coordinate in mm |
 | radius | float | Yes | Circle radius in mm |
 
-### draw_rectangle
+#### draw_rectangle
 
 Draw a rectangle in a sketch.
 
@@ -341,7 +361,7 @@ Draw a rectangle in a sketch.
 | x2 | float | Yes | Opposite corner X in mm |
 | y2 | float | Yes | Opposite corner Y in mm |
 
-### draw_arc
+#### draw_arc
 
 Draw an arc in a sketch.
 
@@ -355,7 +375,7 @@ Draw an arc in a sketch.
 | start_angle | float | Yes | Start angle in degrees |
 | end_angle | float | Yes | End angle in degrees |
 
-### extrude
+#### extrude
 
 Extrude a sketch profile.
 
@@ -370,7 +390,7 @@ Extrude a sketch profile.
 | name | string | No | Name for created body |
 | taper_angle | float | No | Taper angle in degrees (default: 0) |
 
-### revolve
+#### revolve
 
 Revolve a sketch profile around an axis.
 
@@ -384,7 +404,7 @@ Revolve a sketch profile around an axis.
 | profile_index | int | No | Index of profile to revolve (default: 0) |
 | name | string | No | Name for created body |
 
-### fillet
+#### fillet
 
 Apply fillet to edges.
 
@@ -395,7 +415,7 @@ Apply fillet to edges.
 | edge_ids | array | Yes | List of edge IDs to fillet |
 | radius | float | Yes | Fillet radius in mm |
 
-### chamfer
+#### chamfer
 
 Apply chamfer to edges.
 
@@ -407,7 +427,7 @@ Apply chamfer to edges.
 | distance | float | Yes | Chamfer distance in mm |
 | distance2 | float | No | Second distance for asymmetric chamfer |
 
-### create_hole
+#### create_hole
 
 Create a hole in a body.
 
@@ -422,6 +442,541 @@ Create a hole in a body.
 | y | float | No | Y position in mm (default: 0) |
 | name | string | No | Name for the feature |
 | hole_type | string | No | "simple", "countersink", "counterbore" (default: simple) |
+
+### Advanced Sketch Drawing
+
+#### draw_polygon
+
+Draw a regular polygon in a sketch.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| radius | float | Yes | Circumscribed circle radius in mm |
+| sides | int | Yes | Number of sides (3-64) |
+| center_x | float | No | Center X coordinate (default: 0) |
+| center_y | float | No | Center Y coordinate (default: 0) |
+| rotation_angle | float | No | Rotation angle in degrees (default: 0) |
+
+#### draw_ellipse
+
+Draw an ellipse in a sketch.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| major_radius | float | Yes | Major axis radius in mm |
+| minor_radius | float | Yes | Minor axis radius in mm |
+| center_x | float | No | Center X coordinate (default: 0) |
+| center_y | float | No | Center Y coordinate (default: 0) |
+| rotation_angle | float | No | Rotation of major axis in degrees (default: 0) |
+
+#### draw_slot
+
+Draw a slot shape (rounded rectangle/oblong) in a sketch.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| length | float | Yes | Slot length in mm |
+| width | float | Yes | Slot width in mm (diameter of rounded ends) |
+| center_x | float | No | Center X coordinate (default: 0) |
+| center_y | float | No | Center Y coordinate (default: 0) |
+| slot_type | string | No | "overall" or "center_to_center" (default: overall) |
+| rotation_angle | float | No | Rotation angle in degrees (default: 0) |
+
+#### draw_spline
+
+Draw a spline (smooth curve) through control points.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| points | array | Yes | List of point dicts with 'x' and 'y' coordinates |
+| is_closed | boolean | No | Create closed spline loop (default: false) |
+
+**Example points format:**
+```json
+[{"x": 0, "y": 0}, {"x": 20, "y": 15}, {"x": 40, "y": -10}]
+```
+
+#### draw_point
+
+Draw a point in a sketch.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| x | float | Yes | X coordinate in mm |
+| y | float | Yes | Y coordinate in mm |
+| is_construction | boolean | No | Mark as construction geometry (default: false) |
+
+### Sketch Constraints
+
+#### add_constraint_horizontal
+
+Constrain a line to be horizontal.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| curve_id | string | Yes | ID of the line to constrain |
+
+#### add_constraint_vertical
+
+Constrain a line to be vertical.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| curve_id | string | Yes | ID of the line to constrain |
+
+#### add_constraint_coincident
+
+Make two points coincident or place a point on a curve.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| entity1_id | string | Yes | ID of first entity (point or curve) |
+| entity2_id | string | Yes | ID of second entity (point or curve) |
+
+#### add_constraint_perpendicular
+
+Make two lines perpendicular (90 degrees).
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| curve1_id | string | Yes | ID of the first line |
+| curve2_id | string | Yes | ID of the second line |
+
+#### add_constraint_parallel
+
+Make two lines parallel.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| curve1_id | string | Yes | ID of the first line |
+| curve2_id | string | Yes | ID of the second line |
+
+#### add_constraint_tangent
+
+Make two curves tangent at their connection point.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| curve1_id | string | Yes | ID of the first curve |
+| curve2_id | string | Yes | ID of the second curve |
+
+#### add_constraint_equal
+
+Make two curves equal in size (length for lines, radius for circles).
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| curve1_id | string | Yes | ID of the first curve |
+| curve2_id | string | Yes | ID of the second curve |
+
+#### add_constraint_concentric
+
+Make two circles or arcs share the same center.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| curve1_id | string | Yes | ID of the first circle/arc |
+| curve2_id | string | Yes | ID of the second circle/arc |
+
+#### add_constraint_fix
+
+Fix an entity at its current position.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| entity_id | string | Yes | ID of the point or curve to fix |
+
+### Sketch Dimensions
+
+#### add_dimension
+
+Add a dimensional constraint to a sketch.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| dimension_type | string | Yes | "distance", "radius", "diameter", or "angle" |
+| entity1_id | string | Yes | ID of the first entity |
+| value | float | Yes | Dimension value (mm or degrees) |
+| entity2_id | string | No | ID of second entity (for distance between entities, angle) |
+| text_position_x | float | No | X position for dimension text |
+| text_position_y | float | No | Y position for dimension text |
+
+### Sketch Patterns & Operations
+
+#### sketch_mirror
+
+Mirror sketch entities across a line.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| curve_ids | array | Yes | List of curve IDs to mirror |
+| mirror_line_id | string | Yes | ID of the line to mirror across |
+
+#### sketch_circular_pattern
+
+Create a circular pattern of sketch entities.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| curve_ids | array | Yes | List of curve IDs to pattern |
+| count | int | Yes | Total number of instances (2-360) |
+| center_x | float | No | Pattern center X in mm (default: 0) |
+| center_y | float | No | Pattern center Y in mm (default: 0) |
+| total_angle | float | No | Total angle span in degrees (default: 360) |
+
+#### sketch_rectangular_pattern
+
+Create a rectangular pattern of sketch entities.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| curve_ids | array | Yes | List of curve IDs to pattern |
+| x_count | int | Yes | Number of columns |
+| y_count | int | Yes | Number of rows |
+| x_spacing | float | Yes | Column spacing in mm |
+| y_spacing | float | Yes | Row spacing in mm |
+
+#### project_geometry
+
+Project 3D geometry onto a sketch plane.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the target sketch |
+| entity_ids | array | Yes | List of entity IDs to project (edges, faces, bodies) |
+| project_type | string | No | "standard" or "cut_edges" (default: standard) |
+
+### Sketch Annotations
+
+#### add_sketch_text
+
+Add text to a sketch for engraving or embossing.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch |
+| text | string | Yes | Text content |
+| height | float | Yes | Text height in mm |
+| x | float | No | X position in mm (default: 0) |
+| y | float | No | Y position in mm (default: 0) |
+| font_name | string | No | Font name (default: system default) |
+| is_bold | boolean | No | Make text bold (default: false) |
+| is_italic | boolean | No | Make text italic (default: false) |
+
+#### wrap_sketch_to_surface
+
+Project sketch curves onto a curved surface.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the source sketch |
+| face_id | string | Yes | ID of the target curved face |
+| projection_type | string | No | "closest_point" or "along_vector" (default: closest_point) |
+| direction_axis | string | No | Axis for "along_vector": X, Y, Z |
+| create_new_sketch | boolean | No | Create new sketch for result (default: true) |
+
+### Advanced Features
+
+#### sweep
+
+Sweep a 2D profile along a path to create 3D geometry.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| profile_sketch_id | string | Yes | ID of sketch with profile |
+| path_sketch_id | string | Yes | ID of sketch with path |
+| profile_index | int | No | Profile index (default: 0) |
+| operation | string | No | "new_body", "join", "cut", "intersect" (default: new_body) |
+| orientation | string | No | "perpendicular" or "parallel" (default: perpendicular) |
+| name | string | No | Name for the body |
+
+#### loft
+
+Create a smooth shape by blending between multiple profiles.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_ids | array | Yes | List of sketch IDs in order |
+| profile_indices | array | No | Profile indices for each sketch |
+| operation | string | No | "new_body", "join", "cut", "intersect" (default: new_body) |
+| is_solid | boolean | No | Create solid body (default: true) |
+| is_closed | boolean | No | Close loft ends (default: false) |
+| name | string | No | Name for the body |
+| target_body_id | string | No | **Required** for join/cut/intersect operations |
+
+#### create_sphere
+
+Create a solid sphere.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| radius | float | Yes | Sphere radius in mm |
+| x | float | No | Center X position (default: 0) |
+| y | float | No | Center Y position (default: 0) |
+| z | float | No | Center Z position (default: 0) |
+| name | string | No | Name for the body |
+| component_id | string | No | Target component |
+
+#### create_torus
+
+Create a torus (donut/ring shape).
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| major_radius | float | Yes | Distance from center to tube center in mm |
+| minor_radius | float | Yes | Tube radius in mm (must be < major_radius) |
+| x | float | No | Center X position (default: 0) |
+| y | float | No | Center Y position (default: 0) |
+| z | float | No | Center Z position (default: 0) |
+| name | string | No | Name for the body |
+| component_id | string | No | Target component |
+
+#### create_coil
+
+Create a helix/spring shape.
+
+> **Note:** This tool is **NOT SUPPORTED** due to Fusion 360 API limitations. Use `sweep()` with a helical path as a workaround.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| diameter | float | Yes | Coil diameter in mm |
+| pitch | float | Yes | Distance between coils in mm |
+| revolutions | float | Yes | Number of turns |
+| section_size | float | Yes | Wire/section diameter in mm |
+| section_type | string | No | "circular" or "square" (default: circular) |
+
+#### create_pipe
+
+Create a hollow tubular shape along a path.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| path_sketch_id | string | Yes | ID of sketch with path |
+| outer_diameter | float | Yes | Outer diameter in mm |
+| wall_thickness | float | Yes | Wall thickness in mm (must be < outer_diameter/2) |
+| operation | string | No | "new_body", "join", "cut", "intersect" (default: new_body) |
+| name | string | No | Name for the body |
+
+#### create_thread
+
+Add threads to a cylindrical face.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| face_id | string | Yes | ID of the cylindrical face |
+| thread_type | string | Yes | Thread standard (e.g., "ISO Metric profile") |
+| thread_size | string | Yes | Thread size (e.g., "M8x1.25") |
+| is_internal | boolean | No | Internal threads (default: false) |
+| is_full_length | boolean | No | Thread entire length (default: true) |
+| thread_length | float | No | Custom thread length in mm |
+| is_modeled | boolean | No | Create 3D geometry (default: false) |
+
+### Construction Planes
+
+#### create_offset_plane
+
+Create a construction plane offset from an existing plane.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| base_plane | string | Yes | Base plane: XY, YZ, XZ, face_id, or plane_id |
+| offset | float | Yes | Offset distance in mm |
+| name | string | No | Name for the plane |
+| component_id | string | No | Target component |
+
+#### create_angle_plane
+
+Create a construction plane at an angle from a plane along an edge.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| base_plane | string | Yes | Base plane reference |
+| edge_id | string | Yes | ID of edge to rotate around |
+| angle | float | Yes | Rotation angle in degrees |
+| name | string | No | Name for the plane |
+| component_id | string | No | Target component |
+
+#### create_three_point_plane
+
+Create a construction plane through three points.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| point1 | object | Yes | First point {x, y, z} - becomes origin |
+| point2 | object | Yes | Second point {x, y, z} |
+| point3 | object | Yes | Third point {x, y, z} |
+| name | string | No | Name for the plane |
+| component_id | string | No | Target component |
+
+#### create_midplane
+
+Create a construction plane midway between two parallel planes.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| plane1 | string | Yes | First plane reference |
+| plane2 | string | Yes | Second plane reference (must be parallel) |
+| name | string | No | Name for the plane |
+| component_id | string | No | Target component |
+
+### Body Patterns
+
+#### rectangular_pattern
+
+Create a rectangular pattern of bodies or features.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| entity_ids | array | Yes | List of body or feature IDs |
+| entity_type | string | Yes | "bodies" or "features" |
+| x_count | int | Yes | Number of columns (≥2) |
+| x_spacing | float | Yes | Column spacing in mm |
+| x_axis | string | No | Direction: X, Y, Z, or edge_id (default: X) |
+| y_count | int | No | Number of rows (default: 1) |
+| y_spacing | float | No | Row spacing in mm |
+| y_axis | string | No | Second direction |
+
+#### circular_pattern
+
+Create a circular pattern of bodies or features.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| entity_ids | array | Yes | List of body or feature IDs |
+| entity_type | string | Yes | "bodies" or "features" |
+| axis | string | Yes | Rotation axis: X, Y, Z, or axis_id |
+| count | int | Yes | Total instances (≥2) |
+| total_angle | float | No | Angle span in degrees (default: 360) |
+| is_symmetric | boolean | No | Distribute evenly (default: true) |
+
+#### mirror_feature
+
+Mirror bodies or features across a plane.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| entity_ids | array | Yes | List of body or feature IDs |
+| entity_type | string | Yes | "bodies" or "features" |
+| mirror_plane | string | Yes | Symmetry plane: XY, YZ, XZ, plane_id, or face_id |
+
+### Body Operations
+
+#### combine
+
+Combine multiple bodies using boolean operations.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| target_body_id | string | Yes | ID of the body to modify |
+| tool_body_ids | array | Yes | List of body IDs to combine with |
+| operation | string | No | "join", "cut", "intersect" (default: join) |
+| keep_tools | boolean | No | Keep tool bodies after operation (default: false) |
+
+#### split_body
+
+Split a body using a plane or face.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| body_id | string | Yes | ID of the body to split |
+| splitting_tool | string | Yes | XY, YZ, XZ, face_id, or plane_id |
+| extend_splitting_tool | boolean | No | Extend surface to split completely (default: true) |
+
+#### shell
+
+Create a hollow shell from a solid body.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| body_id | string | Yes | ID of the body to shell |
+| face_ids | array | Yes | List of face IDs to remove (become openings) |
+| thickness | float | Yes | Wall thickness in mm |
+| direction | string | No | "inside" or "outside" (default: inside) |
+
+#### thicken
+
+Add thickness to surface faces to create solid bodies.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| face_ids | array | Yes | List of face IDs to thicken |
+| thickness | float | Yes | Thickness in mm |
+| direction | string | No | "both", "positive", "negative" (default: both) |
+| operation | string | No | "new_body", "join", "cut", "intersect" (default: new_body) |
+| is_chain | boolean | No | Include tangent faces (default: true) |
+
+#### emboss
+
+Create raised (emboss) or recessed (deboss) features.
+
+> **Note:** This tool is **NOT SUPPORTED** due to Fusion 360 API limitations. Use `extrude()` with join/cut operations as a workaround.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| sketch_id | string | Yes | ID of the sketch with profile |
+| face_id | string | Yes | ID of the face to emboss onto |
+| depth | float | Yes | Emboss depth in mm |
+| is_emboss | boolean | No | True for raised, False for recessed (default: true) |
+| profile_index | int | No | Profile index (default: 0) |
+| taper_angle | float | No | Side taper in degrees (default: 0) |
 
 ---
 
@@ -638,6 +1193,433 @@ Get the constraint status of a sketch.
   "profiles_count": 1,
   "curves_count": 4,
   "constraints_count": 8
+}
+```
+
+---
+
+## Viewport Tools
+
+### take_screenshot
+
+Capture the current Fusion 360 viewport as a PNG image.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| file_path | string | Yes | Path to save the image file |
+| view | string | No | View to capture: "current", "front", "back", "top", "bottom", "left", "right", "isometric", "trimetric", "home" (default: current) |
+| width | int | No | Image width in pixels (default: 1920, max: 8192) |
+| height | int | No | Image height in pixels (default: 1080, max: 8192) |
+
+**Returns:**
+```json
+{
+  "format": "png",
+  "dimensions": {"width": 1920, "height": 1080},
+  "view": "isometric",
+  "file_path": "/path/to/design.png"
+}
+```
+
+### set_camera
+
+Set the viewport camera position and orientation.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| eye_x | float | Yes | Camera eye X position in mm |
+| eye_y | float | Yes | Camera eye Y position in mm |
+| eye_z | float | Yes | Camera eye Z position in mm |
+| target_x | float | No | Look-at X position (default: 0) |
+| target_y | float | No | Look-at Y position (default: 0) |
+| target_z | float | No | Look-at Z position (default: 0) |
+| up_x | float | No | Up vector X (default: 0) |
+| up_y | float | No | Up vector Y (default: 0) |
+| up_z | float | No | Up vector Z (default: 1) |
+| smooth_transition | boolean | No | Animate camera movement (default: true) |
+
+**Returns:**
+```json
+{
+  "camera": {
+    "eye": {"x": 0, "y": -500, "z": 200},
+    "target": {"x": 0, "y": 0, "z": 0},
+    "up_vector": {"x": 0, "y": 0, "z": 1},
+    "view_extents": 50.0,
+    "is_perspective": true
+  }
+}
+```
+
+### get_camera
+
+Get the current viewport camera state.
+
+**Parameters:** None
+
+**Returns:**
+```json
+{
+  "camera": {
+    "eye": {"x": 0, "y": -500, "z": 200},
+    "target": {"x": 0, "y": 0, "z": 0},
+    "up_vector": {"x": 0, "y": 0, "z": 1},
+    "view_extents": 50.0,
+    "is_perspective": true
+  }
+}
+```
+
+### set_view
+
+Set the viewport to a standard named view.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| view | string | Yes | Named view: "front", "back", "top", "bottom", "left", "right", "isometric", "trimetric", "home" |
+| smooth_transition | boolean | No | Animate view change (default: true) |
+
+**Returns:**
+```json
+{
+  "view": "isometric",
+  "camera": {
+    "eye": {"x": 100, "y": -100, "z": 100},
+    "target": {"x": 0, "y": 0, "z": 0}
+  }
+}
+```
+
+### fit_view
+
+Fit the viewport to show specific entities or all geometry.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| entity_ids | array | No | List of body/component/occurrence IDs. If not provided, fits all visible geometry |
+| smooth_transition | boolean | No | Animate zoom change (default: true) |
+
+**Returns:**
+```json
+{
+  "fitted_to": "all",
+  "camera": {
+    "eye": {"x": 150, "y": -150, "z": 100},
+    "target": {"x": 50, "y": 25, "z": 5}
+  }
+}
+```
+
+---
+
+## Assembly Tools
+
+### Component Tools
+
+#### create_component
+
+Create a new component in the design.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| name | string | Yes | Name for the new component |
+
+**Returns:**
+```json
+{
+  "success": true,
+  "component": {
+    "id": "Bracket",
+    "name": "Bracket",
+    "is_root": false
+  },
+  "occurrence": {
+    "id": "Bracket:1",
+    "transform": [...]
+  },
+  "component_id": "Bracket",
+  "occurrence_id": "Bracket:1"
+}
+```
+
+#### get_components
+
+Get all components in the design.
+
+**Parameters:** None
+
+**Returns:**
+```json
+{
+  "success": true,
+  "components": [
+    {
+      "id": "RootComponent",
+      "name": "Root",
+      "is_root": true,
+      "is_active": false,
+      "bodies_count": 0,
+      "sketches_count": 0,
+      "occurrences_count": 2
+    },
+    {
+      "id": "Bracket",
+      "name": "Bracket",
+      "is_root": false,
+      "is_active": true,
+      "bodies_count": 1,
+      "sketches_count": 1,
+      "occurrences_count": 0
+    }
+  ],
+  "total": 2
+}
+```
+
+#### get_component_by_id
+
+Get detailed information about a specific component.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| component_id | string | Yes | ID of the component |
+
+**Returns:**
+```json
+{
+  "success": true,
+  "component": {
+    "id": "Bracket",
+    "name": "Bracket",
+    "is_root": false,
+    "is_active": true,
+    "bodies_count": 1,
+    "sketches_count": 1,
+    "features_count": 2,
+    "body_ids": ["body_0"],
+    "sketch_ids": ["Sketch1"],
+    "occurrence_ids": ["Bracket:1"],
+    "bounding_box": {
+      "min": {"x": 0, "y": 0, "z": 0},
+      "max": {"x": 50, "y": 10, "z": 30}
+    }
+  }
+}
+```
+
+#### activate_component
+
+Activate a component for editing.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| component_id | string | Yes | ID of the component to activate. Use "RootComponent" for top level |
+
+**Returns:**
+```json
+{
+  "success": true,
+  "active_component": {
+    "id": "Bracket",
+    "name": "Bracket"
+  },
+  "component_id": "Bracket"
+}
+```
+
+#### get_component_bodies
+
+Get all bodies within a specific component.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| component_id | string | Yes | ID of the component |
+
+**Returns:**
+```json
+{
+  "success": true,
+  "bodies": [
+    {
+      "id": "body_0",
+      "name": "Body1",
+      "is_solid": true,
+      "volume": 15000.0
+    }
+  ],
+  "total": 1,
+  "component_id": "Bracket"
+}
+```
+
+### Occurrence Tools
+
+#### get_occurrences
+
+Get all occurrences in the design or within a component.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| component_id | string | No | Filter occurrences by component |
+
+**Returns:**
+```json
+{
+  "success": true,
+  "occurrences": [
+    {
+      "id": "Bracket:1",
+      "name": "Bracket:1",
+      "component_id": "Bracket",
+      "transform": [...],
+      "is_visible": true,
+      "is_grounded": false
+    }
+  ],
+  "total": 1
+}
+```
+
+#### move_occurrence
+
+Move an occurrence to a new position (relative translation).
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| occurrence_id | string | Yes | ID of the occurrence to move |
+| x | float | No | X translation in mm (default: 0) |
+| y | float | No | Y translation in mm (default: 0) |
+| z | float | No | Z translation in mm (default: 0) |
+
+**Returns:**
+```json
+{
+  "success": true,
+  "occurrence": {
+    "id": "Bracket:1",
+    "transform": [...]
+  },
+  "occurrence_id": "Bracket:1",
+  "translation": {"x": 100, "y": 0, "z": 0}
+}
+```
+
+### Joint Tools
+
+#### create_joint
+
+Create a joint between two geometry entities.
+
+**Joint Types:**
+- `rigid`: No relative motion (parts fixed together)
+- `revolute`: Rotation around one axis (hinge)
+- `slider`: Translation along one axis (drawer)
+- `cylindrical`: Rotation + translation along same axis (piston)
+- `pin_slot`: Rotation + perpendicular translation
+- `planar`: Motion in a plane (2D freedom)
+- `ball`: Rotation in all directions (ball joint)
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| geometry1_id | string | Yes | First geometry entity ID (face, edge, or vertex) |
+| geometry2_id | string | Yes | Second geometry entity ID from different occurrence |
+| joint_type | string | No | Type of joint (default: rigid) |
+
+**Returns:**
+```json
+{
+  "success": true,
+  "joint": {
+    "id": "Rigid1",
+    "type": "rigid",
+    "occurrence1_id": "Part1:1",
+    "occurrence2_id": "Part2:1"
+  },
+  "joint_id": "Rigid1"
+}
+```
+
+#### create_joint_between_occurrences
+
+Create a joint between two occurrences at their origins.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| occurrence1_id | string | Yes | First occurrence ID |
+| occurrence2_id | string | Yes | Second occurrence ID |
+| joint_type | string | No | Type of joint (default: rigid) |
+
+**Returns:**
+```json
+{
+  "success": true,
+  "joint": {
+    "id": "Rigid1",
+    "type": "rigid",
+    "occurrence1_id": "Part1:1",
+    "occurrence2_id": "Part2:1"
+  },
+  "joint_id": "Rigid1"
+}
+```
+
+#### get_joints
+
+Get all joints in the design.
+
+**Parameters:** None
+
+**Returns:**
+```json
+{
+  "success": true,
+  "joints": [
+    {
+      "id": "Rigid1",
+      "name": "Rigid1",
+      "joint_type": "rigid",
+      "occurrence1_id": "Part1:1",
+      "occurrence2_id": "Part2:1",
+      "is_suppressed": false
+    }
+  ],
+  "total": 1
+}
+```
+
+#### get_joint_by_id
+
+Get detailed information about a specific joint.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| joint_id | string | Yes | ID of the joint |
+
+**Returns:**
+```json
+{
+  "success": true,
+  "joint": {
+    "id": "Rigid1",
+    "name": "Rigid1",
+    "joint_type": "rigid",
+    "occurrence1_id": "Part1:1",
+    "occurrence2_id": "Part2:1",
+    "is_suppressed": false
+  }
 }
 ```
 
