@@ -51,3 +51,9 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# MCP Configuration (contains local paths)
+.mcp.json
+
+# Claude Code
+.claude/
