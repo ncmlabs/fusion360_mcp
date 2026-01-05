@@ -2694,3 +2694,199 @@ def add_dimension(
             f"Failed to add {dimension_type} dimension: {str(e)}",
             fusion_error=str(e)
         )
+
+
+def wrap_sketch_to_surface(
+    sketch_id: str,
+    face_id: str,
+    projection_type: str = "closest_point",
+    direction_axis: Optional[str] = None,
+    create_new_sketch: bool = True,
+) -> Dict[str, Any]:
+    """Wrap sketch curves onto a curved surface using projection.
+
+    Projects 2D sketch geometry (curves, text outlines) onto curved surfaces
+    like cylinders, enabling text/logos to conform to cylindrical objects.
+    Uses Fusion 360's `Sketch.projectToSurface()` method.
+
+    Args:
+        sketch_id: ID of the source sketch containing curves to wrap
+        face_id: ID of the target curved face (e.g., cylinder surface)
+        projection_type: Projection method:
+            - "closest_point": Project curves to closest point on surface (default)
+            - "along_vector": Project along a specified axis direction
+        direction_axis: Required when projection_type is "along_vector".
+            Options: "X", "Y", "Z" for construction axes
+        create_new_sketch: If True (default), create a new sketch for the
+            projected curves. If False, add to existing sketch.
+
+    Returns:
+        Dict containing:
+        - success: True if projection succeeded
+        - wrapped_curves: List of new curve IDs created on the surface
+        - wrapped_sketch_id: ID of the sketch containing wrapped curves
+        - source_sketch_id: Original sketch ID
+        - face_id: Target face ID
+        - projection_type: Projection method used
+        - curves_created: Number of curves created
+
+    Raises:
+        InvalidParameterError: If parameters are invalid
+        EntityNotFoundError: If sketch or face not found
+        FeatureError: If projection fails
+
+    Example:
+        # Create a cylinder and wrap text onto it
+        cyl = await create_cylinder(radius=25, height=100)
+        body = await get_body_by_id(body_id=cyl["body"]["id"], include_faces=True)
+        cyl_face_id = body["faces"][1]["id"]  # Cylindrical face
+
+        # Create a sketch with shapes to wrap
+        sketch = await create_sketch(plane="XY")
+        await draw_circle(sketch_id=sketch["sketch"]["id"], center_x=0, center_y=0, radius=5)
+
+        # Wrap the sketch onto the cylinder
+        result = await wrap_sketch_to_surface(
+            sketch_id=sketch["sketch"]["id"],
+            face_id=cyl_face_id
+        )
+    """
+    if projection_type not in ["closest_point", "along_vector"]:
+        raise InvalidParameterError(
+            "projection_type", projection_type,
+            valid_values=["closest_point", "along_vector"]
+        )
+
+    if projection_type == "along_vector" and not direction_axis:
+        raise InvalidParameterError(
+            "direction_axis", None,
+            reason="direction_axis is required when projection_type is 'along_vector'"
+        )
+
+    if direction_axis and direction_axis.upper() not in ["X", "Y", "Z"]:
+        raise InvalidParameterError(
+            "direction_axis", direction_axis,
+            valid_values=["X", "Y", "Z"]
+        )
+
+    registry = get_registry()
+    source_sketch = _get_sketch(sketch_id)
+
+    # Get the target face
+    face = registry.get_sub_entity(face_id)
+    if not face:
+        raise EntityNotFoundError(
+            "Face", face_id,
+            suggestion="Use get_body_by_id with include_faces=True to find face IDs"
+        )
+
+    # Verify it's a BRepFace
+    if not hasattr(face, 'geometry'):
+        raise InvalidParameterError(
+            "face_id", face_id,
+            reason="Entity is not a valid BRepFace"
+        )
+
+    try:
+        design = _get_active_design()
+        root = design.rootComponent
+
+        # Collect curves from the source sketch
+        curves_collection = adsk.core.ObjectCollection.create()
+        curve_count = 0
+
+        # Add all sketch curves
+        for i in range(source_sketch.sketchCurves.count):
+            curve = source_sketch.sketchCurves.item(i)
+            curves_collection.add(curve)
+            curve_count += 1
+
+        # Also add sketch points if any
+        for i in range(source_sketch.sketchPoints.count):
+            point = source_sketch.sketchPoints.item(i)
+            # Skip origin point
+            if not point.isFixed:
+                curves_collection.add(point)
+
+        if curves_collection.count == 0:
+            raise FeatureError(
+                "wrap_sketch_to_surface",
+                "Source sketch has no curves to project",
+                affected_entities=[sketch_id]
+            )
+
+        # Create faces collection with the target face
+        faces_collection = adsk.core.ObjectCollection.create()
+        faces_collection.add(face)
+
+        # Determine the sketch to project onto
+        if create_new_sketch:
+            # Create a new sketch on the target face
+            sketches = root.sketches
+            target_sketch = sketches.add(face)
+            target_sketch_id = registry.register_sketch(target_sketch)
+        else:
+            # Use the source sketch (curves will be added to it)
+            target_sketch = source_sketch
+            target_sketch_id = sketch_id
+
+        # Determine projection type
+        if projection_type == "closest_point":
+            project_type = adsk.fusion.SurfaceProjectTypes.ClosestPointSurfaceProjectType
+            direction_entity = None
+        else:
+            project_type = adsk.fusion.SurfaceProjectTypes.AlongVectorSurfaceProjectType
+            # Get the construction axis for direction
+            axis_upper = direction_axis.upper()
+            if axis_upper == "X":
+                direction_entity = root.xConstructionAxis
+            elif axis_upper == "Y":
+                direction_entity = root.yConstructionAxis
+            else:  # Z
+                direction_entity = root.zConstructionAxis
+
+        # Perform the projection
+        if direction_entity:
+            projected_entities = target_sketch.projectToSurface(
+                faces_collection,
+                curves_collection,
+                project_type,
+                direction_entity
+            )
+        else:
+            projected_entities = target_sketch.projectToSurface(
+                faces_collection,
+                curves_collection,
+                project_type
+            )
+
+        # Register projected curves
+        wrapped_curve_ids = []
+        if projected_entities:
+            base_index = target_sketch.sketchCurves.count - projected_entities.count
+            for i in range(projected_entities.count):
+                entity = projected_entities.item(i)
+                curve_id = registry.register_sub_entity(
+                    target_sketch_id, "curve", base_index + i, entity
+                )
+                wrapped_curve_ids.append(curve_id)
+
+        return {
+            "success": True,
+            "wrapped_curves": wrapped_curve_ids,
+            "wrapped_sketch_id": target_sketch_id,
+            "source_sketch_id": sketch_id,
+            "face_id": face_id,
+            "projection_type": projection_type,
+            "curves_created": len(wrapped_curve_ids),
+            "profiles_count": target_sketch.profiles.count,
+        }
+
+    except Exception as e:
+        if isinstance(e, (InvalidParameterError, EntityNotFoundError, FeatureError)):
+            raise
+        raise FeatureError(
+            "wrap_sketch_to_surface",
+            f"Failed to wrap sketch to surface: {str(e)}",
+            fusion_error=str(e)
+        )
