@@ -1,0 +1,38 @@
+[tool.bumpversion]
+current_version = "0.1.0"
+parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
+serialize = ["{major}.{minor}.{patch}"]
+search = "{current_version}"
+replace = "{new_version}"
+commit = false
+tag = false
+
+# Server pyproject.toml
+[[tool.bumpversion.files]]
+filename = "Server/pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+# Server __init__.py
+[[tool.bumpversion.files]]
+filename = "Server/src/fusion360_mcp_server/__init__.py"
+search = '__version__ = "{current_version}"'
+replace = '__version__ = "{new_version}"'
+
+# Server system_tools.py
+[[tool.bumpversion.files]]
+filename = "Server/src/fusion360_mcp_server/tools/system_tools.py"
+search = 'SERVER_VERSION = "{current_version}"'
+replace = 'SERVER_VERSION = "{new_version}"'
+
+# Fusion Add-in http_server.py
+[[tool.bumpversion.files]]
+filename = "FusionAddin/core/http_server.py"
+search = 'ADDIN_VERSION = "{current_version}"'
+replace = 'ADDIN_VERSION = "{new_version}"'
+
+# Fusion Add-in manifest
+[[tool.bumpversion.files]]
+filename = "FusionAddin/FusionMCP.manifest"
+search = '"version": "{current_version}"'
+replace = '"version": "{new_version}"'
