@@ -6,7 +6,7 @@
     "description": {
         "": "MCP Add-in for AI-assisted CAD design in Fusion 360"
     },
-    "version": "0.1.1",
+    "version": "0.1.2",
     "runOnStartup": true,
     "supportedOS": "windows|mac",
     "editEnabled": true

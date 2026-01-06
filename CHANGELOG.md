@@ -7,13 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Bug Fixes
+
+- Remove accidental file and quote pip package spec
+
+### Miscellaneous Tasks
+
+- Remove accidental feedback files
+- Remove accidental feedback files
+## [0.1.1] - 2026-01-05
+
+### Bug Fixes
+
+- Use dynamic SERVER_VERSION in test instead of hardcoded value
+- Auto-sync development branch after release
+- Quote pip package spec to prevent shell redirect
+
 ### Documentation
 
 - Add community governance files for open source release
+- Add missing tools to API reference and expand README features
 
 ### Features
 
 - Add demo GIF to README
+
+### Miscellaneous Tasks
+
+- Sync version to 0.1.1 on development branch
 ## [0.1.0] - 2026-01-05
 
 ### Bug Fixes

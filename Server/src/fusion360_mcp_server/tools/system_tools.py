@@ -10,7 +10,7 @@ from ..services.fusion_client import FusionClient
 from ..logging import get_logger
 
 # Server version (should match pyproject.toml)
-SERVER_VERSION = "0.1.1"
+SERVER_VERSION = "0.1.2"
 API_VERSION = "1.0"
 
 logger = get_logger(__name__)
